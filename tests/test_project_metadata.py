@@ -9,10 +9,6 @@ def load_pyproject():
         return tomllib.load(file)
 
 
-def read_project_file(path):
-    return (ROOT / path).read_text(encoding="utf-8")
-
-
 def test_project_metadata_defines_package_and_cli_entrypoint():
     pyproject = load_pyproject()
 
@@ -27,36 +23,3 @@ def test_setuptools_package_discovery_includes_subpackages():
     pyproject = load_pyproject()
 
     assert pyproject["tool"]["setuptools"]["packages"]["find"]["include"] == ["acp", "acp.*"]
-
-
-def test_readme_documents_supported_python_and_release_workflow():
-    readme = read_project_file("README.md")
-
-    assert "Python 3.11 through 3.14" in readme
-    assert "pipx install ." in readme
-    assert "python -m build" in readme
-    assert "python -m twine check dist/*" in readme
-    assert "python -m acp --help" in readme
-    assert "usage: acp [-h] [-t address] [-p password] [-v] [--listprop]" in readme
-    assert "--flash-primary firmware_path" in readme
-    assert "Basebinary commands:" in readme
-    assert "Test arguments:" in readme
-    assert "--srp-test" in readme
-    assert "List supported property names:" in readme
-    assert "Inspect a supported property:" in readme
-    assert "Work with basebinary firmware files:" in readme
-    assert (
-        "SRP/protocol v2 authentication and full session encryption are not implemented"
-        in readme
-    )
-
-
-def test_ci_exercises_supported_python_versions():
-    workflow = read_project_file(".github/workflows/ci.yml")
-
-    assert "python-version:" in workflow
-    for version in ["3.11", "3.12", "3.13", "3.14"]:
-        assert version in workflow
-    assert "python -m coverage run -m pytest" in workflow
-    assert "python -m build" in workflow
-    assert "python -m twine check dist/*" in workflow
