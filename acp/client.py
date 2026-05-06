@@ -4,6 +4,7 @@ import struct
 import time
 
 from .cflbinary import CFLBinaryPListComposer, CFLBinaryPListParser
+from .exception import ACPClientError
 from .message import ACPMessage
 from .property import ACPProperty
 from .session import ACPClientSession
@@ -41,6 +42,35 @@ class ACPClient(object):
 		return self.recv(ACPProperty.element_header_size)
 	
 	
+	def _raise_for_reply_error(self, operation, reply_header):
+		if reply_header.error_code != 0:
+			raise ACPClientError(
+				"{0} failed with error code: {1:#x}".format(
+					operation,
+					reply_header.error_code,
+				)
+			)
+
+
+	def _unpack_property_error(self, operation, name, prop_data):
+		try:
+			(error_code, ) = struct.unpack(">I", prop_data)
+		except struct.error as e:
+			raise ACPClientError(
+				"{0} returned a malformed property error for \"{1}\"".format(
+					operation,
+					name,
+				)
+			) from e
+		raise ACPClientError(
+			"error {0} for property \"{1}\": {2:#x}".format(
+				operation,
+				name,
+				error_code,
+			)
+		)
+
+
 	def get_properties(self, prop_names=None):
 		if prop_names is None:
 			prop_names = []
@@ -55,10 +85,7 @@ class ACPClient(object):
 		raw_reply = self.recv_message_header()
 		reply_header = ACPMessage.parse_raw(raw_reply)
 		
-		if reply_header.error_code != 0:
-			print("get_properties error code: {0:#x}".format(reply_header.error_code))
-			#XXX: blah, what to do...
-			return []
+		self._raise_for_reply_error("get_properties", reply_header)
 		
 		props = []
 		while True:
@@ -72,9 +99,11 @@ class ACPClient(object):
 			logging.debug("prop_data {0!r}".format(prop_data))
 			
 			if flags & 1:
-				(error_code, ) = struct.unpack(">I", prop_data)
-				print("error requesting value for property \"{0}\": {1:#x}".format(name, error_code))
-				continue
+				try:
+					self._unpack_property_error("requesting value", name, prop_data)
+				except ACPClientError as e:
+					logging.warning(str(e))
+					continue
 			
 			prop = ACPProperty(name, prop_data)
 			logging.debug("prop {0!r}".format(prop))
@@ -103,10 +132,7 @@ class ACPClient(object):
 		raw_reply = self.recv_message_header()
 		reply_header = ACPMessage.parse_raw(raw_reply)
 		
-		if reply_header.error_code != 0:
-			print("set_properties error code: {0:#x}".format(reply_header.error_code))
-			#XXX: blah, what to do...
-			return
+		self._raise_for_reply_error("set_properties", reply_header)
 		
 		prop_header = self.recv_property_element_header()
 		name, flags, size = ACPProperty.parse_raw_element_header(prop_header)
@@ -118,9 +144,7 @@ class ACPClient(object):
 		logging.debug("prop_data {0!r}".format(prop_data))
 		
 		if flags & 1:
-			(error_code, ) = struct.unpack(">I", prop_data)
-			print("error setting value for property \"{0}\": {1:#x}".format(name, error_code))
-			return
+			self._unpack_property_error("setting value", name, prop_data)
 			
 		prop = ACPProperty(name, prop_data)
 		logging.debug("prop {0!r}".format(prop))
@@ -134,6 +158,7 @@ class ACPClient(object):
 		self.send(ACPMessage.compose_feat_command(0))
 		
 		reply_header = ACPMessage.parse_raw(self.recv_message_header())
+		self._raise_for_reply_error("get_features", reply_header)
 		
 		reply = self.recv(reply_header.body_size)
 		
@@ -144,15 +169,21 @@ class ACPClient(object):
 		self.send(ACPMessage.compose_flash_primary_command(0, self.password, payload))
 		
 		reply_header = ACPMessage.parse_raw(self.recv_message_header())
+		self._raise_for_reply_error("flash_primary", reply_header)
 		
 		return self.recv(reply_header.body_size)
 	
 	
 	def authenticate_AppleSRP(self):
 		#XXX: STILL TESTING SHIT
-		import ctypes
-		from .clibs import AppleSRP
 		from collections import OrderedDict		
+		try:
+			import ctypes
+			from .clibs import AppleSRP
+		except (ImportError, OSError, AttributeError) as e:
+			raise ACPClientError(
+				"AppleSRP authentication is unavailable on this system"
+			) from e
 		
 		username = "admin"
 		username_bytes = username.encode("utf-8")
@@ -165,10 +196,7 @@ class ACPClient(object):
 		raw_reply_header = self.recv_message_header()
 		reply_header = ACPMessage.parse_raw(raw_reply_header)
 		
-		if reply_header.error_code != 0:
-			logging.error("authenticate error code: {0:#x}".format(reply_header.error_code))
-			#XXX: blah, what to do...
-			return
+		self._raise_for_reply_error("authenticate_AppleSRP", reply_header)
 		
 		logging.debug("recv_size: {0}".format(reply_header.body_size))
 		raw_message = self.recv(reply_header.body_size)
@@ -240,10 +268,7 @@ class ACPClient(object):
 		raw_reply_header = self.recv_message_header()
 		reply_header = ACPMessage.parse_raw(raw_reply_header)
 		
-		if reply_header.error_code != 0:
-			logging.debug("authenticate error code: {0:#x}".format(reply_header.error_code))
-			#XXX: blah, what to do...
-			return
+		self._raise_for_reply_error("authenticate_AppleSRP", reply_header)
 		
 		logging.debug("recv_size: {0}".format(reply_header.body_size))
 		raw_message = self.recv(reply_header.body_size)

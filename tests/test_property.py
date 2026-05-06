@@ -1,3 +1,5 @@
+import builtins
+
 import pytest
 
 from acp.exception import ACPPropertyError
@@ -31,6 +33,14 @@ def test_string_property_rejects_malformed_utf8_as_property_error():
         ACPProperty.parse_raw_element(b"syNm\x00\x00\x00\x00\x00\x00\x00\x01\xff")
 
 
+def test_parse_raw_element_rejects_size_mismatches():
+    with pytest.raises(ACPPropertyError, match="shorter than declared size"):
+        ACPProperty.parse_raw_element(b"syNm\x00\x00\x00\x00\x00\x00\x00\x06rou")
+
+    with pytest.raises(ACPPropertyError, match="extra data found"):
+        ACPProperty.parse_raw_element(b"syNm\x00\x00\x00\x00\x00\x00\x00\x03router")
+
+
 def test_integer_property_accepts_wire_bytes_and_composes_big_endian_value():
     prop = ACPProperty("syUT", b"\x00\x00\x00\x2a")
 
@@ -60,6 +70,35 @@ def test_log_property_formats_null_delimited_bytes():
     prop = ACPProperty("logm", b"one\x00two\x00")
 
     assert str(prop) == "one\ntwo\n"
+
+
+def test_property_validation_uses_structured_rules_without_eval(monkeypatch):
+    def fail_eval(*_args, **_kwargs):
+        raise AssertionError("eval should not be used for property validation")
+
+    monkeypatch.setattr(builtins, "eval", fail_eval)
+
+    assert ACPProperty("LEDc", 3).value == 3
+    assert ACPProperty("GPIs", b"\x00" * 8).value == b"\x00" * 8
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("LEDc", 4),
+        ("acRB", 1),
+        ("dbug", 0x100000000),
+        ("GPIs", b"\x00" * 7),
+    ],
+)
+def test_property_validation_rejects_out_of_range_values(name, value):
+    with pytest.raises(ACPPropertyError, match="invalid value"):
+        ACPProperty(name, value)
+
+
+def test_compose_raw_element_rejects_integer_values_outside_u32():
+    with pytest.raises(ACPPropertyError, match="fit unsigned 32-bit"):
+        ACPProperty.compose_raw_element(0, ACPProperty("syUT", 0x100000000))
 
 
 def test_null_property_marker_round_trips_to_empty_property():

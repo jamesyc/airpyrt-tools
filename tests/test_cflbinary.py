@@ -46,3 +46,21 @@ def test_parser_rejects_unterminated_utf8_string():
 def test_parser_rejects_malformed_utf8_string():
     with pytest.raises(CFLBinaryPListParseError, match="failed to decode UTF-8 string"):
         CFLBinaryPListParser.parse(b"CFB0p\xff\x00END!")
+
+
+def test_parser_rejects_truncated_int_and_real_values():
+    with pytest.raises(CFLBinaryPListParseError, match="failed to unpack int value"):
+        CFLBinaryPListParser.parse(b"CFB0\x12\x00END!")
+
+    with pytest.raises(CFLBinaryPListParseError, match="failed to unpack float value"):
+        CFLBinaryPListParser.parse(b"CFB0#abcEND!")
+
+
+def test_parser_rejects_truncated_data_value():
+    with pytest.raises(CFLBinaryPListParseError, match="failed to unpack data value"):
+        CFLBinaryPListParser.parse(b"CFB0CabEND!")
+
+
+def test_parser_rejects_invalid_extended_count_marker():
+    with pytest.raises(CFLBinaryPListParseError, match="expected count"):
+        CFLBinaryPListParser.parse(b"CFB0Opcount\x00END!")

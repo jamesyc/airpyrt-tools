@@ -173,8 +173,8 @@ class CFLBinaryPListParser(object):
 		
 		try:
 			(int_val, ) = struct.unpack(int_fmt, int_bytes)
-		except struct.error:
-			raise CFLBinaryPListParseError("failed to unpack int value")
+		except struct.error as e:
+			raise CFLBinaryPListParseError("failed to unpack int value") from e
 		
 		return int_val, data
 	
@@ -199,8 +199,8 @@ class CFLBinaryPListParser(object):
 		
 		try:
 			(float_val, ) = struct.unpack(real_fmt, real_bytes)
-		except struct.error:
-			raise CFLBinaryPListParseError("failed to unpack float value")
+		except struct.error as e:
+			raise CFLBinaryPListParseError("failed to unpack float value") from e
 		
 		return float_val, data
 	
@@ -239,8 +239,8 @@ class CFLBinaryPListParser(object):
 		"""
 		try:
 			marker = data[0]
-		except IndexError:
-			raise CFLBinaryPListParseError("failed to unpack object marker")
+		except IndexError as e:
+			raise CFLBinaryPListParseError("failed to unpack object marker") from e
 		
 		return marker, data[1:]
 	
@@ -282,6 +282,8 @@ class CFLBinaryPListParser(object):
 		
 		elif object_type == 0x40:     # data
 			size, data = cls._unpack_count(object_info, data)
+			if len(data) < size:
+				raise CFLBinaryPListParseError("failed to unpack data value")
 			#XXX: we return data as str type, is this ok?
 			return _lslice(data, size)
 		
@@ -302,8 +304,8 @@ class CFLBinaryPListParser(object):
 				raw += byte
 			try:
 				obj = bytes(raw).decode("utf-8")
-			except UnicodeDecodeError:
-				raise CFLBinaryPListParseError("failed to decode UTF-8 string")
+			except UnicodeDecodeError as e:
+				raise CFLBinaryPListParseError("failed to decode UTF-8 string") from e
 			return obj, data
 		
 		elif object_type == 0x80:      # uid
@@ -363,12 +365,13 @@ class CFLBinaryPListParser(object):
 		if header_data != _header_magic:
 			raise CFLBinaryPListParseError("bad header magic")
 		
-		# read object stream (assume one root object)
-		obj, remaining_data = cls._unpack_object(data)
-		if len(remaining_data) > _footer_size:
-			raise CFLBinaryPListParseError("extra data found after unpacking root object")
-		
-		if remaining_data != _footer_magic:
+		object_data, footer_data = _lslice(data, len(data) - _footer_size)
+		if footer_data != _footer_magic:
 			raise CFLBinaryPListParseError("bad footer magic")
+
+		# read object stream (assume one root object)
+		obj, remaining_data = cls._unpack_object(object_data)
+		if remaining_data:
+			raise CFLBinaryPListParseError("extra data found after unpacking root object")
 		
 		return obj

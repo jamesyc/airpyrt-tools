@@ -1,6 +1,6 @@
-from Crypto.Cipher import AES
-from Crypto.Protocol import KDF
-from Crypto.Util import Counter
+from Cryptodome.Cipher import AES
+from Cryptodome.Protocol import KDF
+from Cryptodome.Util import Counter
 
 
 PBKDF_salt0 = bytes.fromhex("F072FA3F66B410A135FAE8E6D1D43D5F")

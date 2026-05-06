@@ -3,7 +3,7 @@ import struct
 import zlib
 
 import pytest
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 
 from acp.basebinary import Basebinary, BasebinaryError, _derive_key
 
@@ -24,6 +24,11 @@ def test_parse_rejects_bad_header_magic():
 
     with pytest.raises(BasebinaryError, match="bad header magic"):
         Basebinary.parse_header(header)
+
+
+def test_parse_header_rejects_short_header_as_basebinary_error():
+    with pytest.raises(BasebinaryError, match="failed to parse firmware header"):
+        Basebinary.parse_header(b"short")
 
 
 def test_parse_returns_inner_bytes_when_checksum_matches():
@@ -47,3 +52,13 @@ def test_extract_finds_gzip_payload_inside_bytes():
     payload = gzip.compress(b"hello")
 
     assert Basebinary.extract(b"prefix" + payload) == b"hello"
+
+
+def test_extract_rejects_missing_gzip_payload_as_basebinary_error():
+    with pytest.raises(BasebinaryError, match="gzip payload not found"):
+        Basebinary.extract(b"no gzip payload")
+
+
+def test_extract_rejects_invalid_gzip_payload_as_basebinary_error():
+    with pytest.raises(BasebinaryError, match="failed to decompress gzip payload"):
+        Basebinary.extract(b"prefix\x1f\x8b\x08invalid")

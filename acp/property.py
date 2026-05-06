@@ -13,7 +13,7 @@ _acp_properties = [
 	# name (required) is a 4 character string,
 	# type (required) is a valid property type (str, dec, hex, log, mac, cfb, bin)
 	# description (required) is a short, one-line description of the property
-	# validation (optional) is eval()d to verify the input value for setting a property
+	# validation (optional) names a structured rule used to verify property values
 	("buil","str","Build string?",""),
 	("DynS","cfb","DNS",""),
 	#("cfpf","","",""),
@@ -550,6 +550,40 @@ _acp_properties = [
 	#("awcc","","",""),
 	]
 
+def _validation_range(min_value, max_value):
+	def _validate(value):
+		return isinstance(value, int) and min_value <= value <= max_value
+	return _validate
+
+
+def _validation_equals(expected):
+	def _validate(value):
+		return value == expected
+	return _validate
+
+
+def _validation_len(expected):
+	def _validate(value):
+		return len(value) == expected
+	return _validate
+
+
+_validation_rules = {
+	"0 <= value <= 0xFFFFFFFF": _validation_range(0, 0xFFFFFFFF),
+	"value == 0": _validation_equals(0),
+	"0 <= value <= 3": _validation_range(0, 3),
+	"len(value) == 8": _validation_len(8),
+}
+
+
+def _get_validation_rule(validation):
+	if not validation:
+		return None
+	if validation not in _validation_rules:
+		raise AssertionError("unsupported property validation rule: {0}".format(validation))
+	return _validation_rules[validation]
+
+
 def _generate_acp_property_dict():	
 	props = {}
 	for (name, type, description, validation) in _acp_properties:
@@ -557,7 +591,12 @@ def _generate_acp_property_dict():
 		assert len(name) == 4, "bad name in _acp_properties list: {0}".format(name)
 		assert type in ["str", "dec", "hex", "log", "mac", "cfb", "bin"], "bad type in _acp_properties list for name: {0}".format(name)
 		assert description, "missing description in _acp_properties list for name: {0}".format(name)
-		props[name] = dict(type=type, description=description, validation=validation)
+		props[name] = dict(
+			type=type,
+			description=description,
+			validation=validation,
+			validator=_get_validation_rule(validation),
+		)
 	return props
 
 
@@ -615,12 +654,11 @@ class ACPProperty(object):
 			try:
 				value = _init_handler(value)
 			except ACPPropertyInitValueError as e:
-				raise ACPPropertyError("{0!s} provided for \"{1}\" property type: {2!r}".format(e, prop_type, value))
+				raise ACPPropertyError("{0!s} provided for \"{1}\" property type: {2!r}".format(e, prop_type, value)) from e
 			logging.debug("new value: {0!r} type: {1}".format(value, type(value)))
 			
-			#XXX: this is still really hacky, should probably do something with anonymous functions or introspection
-			validation_expr = self.get_property_info_string(name, "validation")
-			if validation_expr and not eval(validation_expr):
+			validator = self.get_property_validator(name)
+			if validator and not validator(value):
 				raise ACPPropertyError("invalid value passed to initializer for property \"{0}\": {1}".format(name, repr(value)))
 		
 		self.name = name
@@ -632,8 +670,8 @@ class ACPProperty(object):
 		elif isinstance(value, bytes):
 			try:
 				return struct.unpack("!I", value)[0]
-			except struct.error:
-				raise ACPPropertyInitValueError("invalid packed binary string")
+			except struct.error as e:
+				raise ACPPropertyInitValueError("invalid packed binary string") from e
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
@@ -643,8 +681,8 @@ class ACPProperty(object):
 		elif isinstance(value, bytes):
 			try:
 				return struct.unpack("!I", value)[0]
-			except struct.error:
-				raise ACPPropertyInitValueError("invalid packed binary string")
+			except struct.error as e:
+				raise ACPPropertyInitValueError("invalid packed binary string") from e
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
@@ -660,8 +698,8 @@ class ACPProperty(object):
 			if len(mac_bytes) == 6:
 				try:
 					return bytes.fromhex("".join(mac_bytes))
-				except ValueError:
-					raise ACPPropertyInitValueError("non-hex digit in value")
+				except ValueError as e:
+					raise ACPPropertyInitValueError("non-hex digit in value") from e
 			# fallthrough
 			raise ACPPropertyInitValueError("invalid value")
 		else:
@@ -691,8 +729,8 @@ class ACPProperty(object):
 		elif isinstance(value, bytes):
 			try:
 				return value.decode("utf-8")
-			except UnicodeDecodeError:
-				raise ACPPropertyInitValueError("invalid UTF-8 string")
+			except UnicodeDecodeError as e:
+				raise ACPPropertyInitValueError("invalid UTF-8 string") from e
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
@@ -739,8 +777,8 @@ class ACPProperty(object):
 	
 	def _format_str(self, value):
 		return value
-	
-	
+
+
 	@classmethod
 	def get_supported_property_names(cls):
 		props = []
@@ -762,21 +800,31 @@ class ACPProperty(object):
 			logging.error("invalid property info key \"{0}\"".format(key))
 			return None
 		return prop_info[key]
-	
-	
+
+
+	@classmethod
+	def get_property_validator(cls, prop_name):
+		return cls.get_property_info_string(prop_name, "validator")
+
+
 	@classmethod
 	def parse_raw_element(cls, data):
 		name, flags, size = cls.parse_raw_element_header(data[:cls.element_header_size])
 		#TODO: handle flags!???
-		return cls(name, data[cls.element_header_size:])
+		value_data = data[cls.element_header_size:]
+		if len(value_data) < size:
+			raise ACPPropertyError("property element data shorter than declared size")
+		if len(value_data) > size:
+			raise ACPPropertyError("extra data found after property element")
+		return cls(name, value_data)
 	
 	
 	@classmethod
 	def parse_raw_element_header(cls, data):
 		try:
 			name, flags, size = cls._element_header_format.unpack(data)
-		except struct.error:
-			raise ACPPropertyError("failed to parse property element header")
+		except struct.error as e:
+			raise ACPPropertyError("failed to parse property element header") from e
 		return cls._name_from_wire(name), flags, size
 	
 	
@@ -788,7 +836,8 @@ class ACPProperty(object):
 		value = property.value if property.value is not None else cls._null_raw_value
 		if isinstance(value, int):
 			st = struct.Struct(">I")
-			#XXX: this could throw an exception, we need to range check int/hex values to ensure they pack into 32 bits still
+			if value < 0 or value > 0xFFFFFFFF:
+				raise ACPPropertyError("integer property value must fit unsigned 32-bit")
 			return cls.compose_raw_element_header(name, flags, st.size) + st.pack(value)
 		elif isinstance(value, bytes):
 			return cls.compose_raw_element_header(name, flags, len(value)) + value
@@ -803,5 +852,5 @@ class ACPProperty(object):
 	def compose_raw_element_header(cls, name, flags, size):
 		try:
 			return cls._element_header_format.pack(cls._name_to_wire(name), flags, size)
-		except struct.error:
-			raise ACPPropertyError("failed to compose property header")
+		except struct.error as e:
+			raise ACPPropertyError("failed to compose property header") from e

@@ -58,3 +58,17 @@ def test_parse_rejects_bad_body_checksum():
 
     with pytest.raises(ACPMessageError, match="header checksum"):
         ACPMessage.parse_raw(bytes(packet))
+
+
+def test_parse_rejects_incomplete_message_body():
+    packet = ACPMessage.compose_getprop_command(4, "pw", b"abcd")
+
+    with pytest.raises(ACPMessageError, match="message body size"):
+        ACPMessage.parse_raw(packet[:-1])
+
+
+def test_parse_rejects_invalid_negative_body_size():
+    packet = ACPMessage(0x00030001, 0, 0, 0x14, 0, b"\x00" * 32, None, -2)._compose_header()
+
+    with pytest.raises(ACPMessageError, match="invalid body size"):
+        ACPMessage.parse_raw(packet)

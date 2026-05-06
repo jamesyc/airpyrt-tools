@@ -10,6 +10,11 @@ class ACPClientError(ACPError):
 	pass
 
 
+class ACPSessionError(ACPError):
+	"""Exception raised for errors in ACP socket sessions"""
+	pass
+
+
 class ACPCommandLineError(ACPError):
 	"""Exception raised for command line invocation errors"""
 	pass
@@ -23,4 +28,3 @@ class ACPMessageError(ACPError):
 class ACPPropertyError(ACPError):
 	"""Exception raised for errors processing ACP properties"""
 	pass
-

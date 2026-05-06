@@ -100,10 +100,15 @@ class ACPMessage(object):
 	
 	@classmethod
 	def parse_raw(cls, data):
+		try:
+			data = _as_bytes(data)
+		except TypeError as e:
+			raise ACPMessageError("expected str or bytes") from e
+		if data is None:
+			raise ACPMessageError("expected str or bytes")
 		# bail early if there is not enough data
 		if len(data) < cls.header_size:
 			raise ACPMessageError("need to pass at least {0} bytes".format(cls.header_size))
-		data = _as_bytes(data)
 		header_data = data[:cls.header_size]
 		# make sure there's data beyond the header before we try to access it
 		body_data = data[cls.header_size:] if len(data) > cls.header_size else None
@@ -130,14 +135,17 @@ class ACPMessage(object):
 		tmphdr = cls._header_format.pack(magic, version, 0, body_checksum, body_size, flags, unused, command, error_code, key)
 		if header_checksum != _adler32_i32(tmphdr):
 			raise ACPMessageError("header checksum does not match")
+
+		if body_size < -1:
+			raise ACPMessageError("invalid body size")
 		
-		if body_data and body_size == -1:
+		if body_data is not None and body_size == -1:
 			raise ACPMessageError("cannot handle stream header with data attached")
 		
-		if body_data and body_size != len(body_data):
+		if body_data is not None and body_size != len(body_data):
 			raise ACPMessageError("message body size does not match available data")
 		
-		if body_data and body_checksum != _adler32_i32(body_data):
+		if body_data is not None and body_checksum != _adler32_i32(body_data):
 			raise ACPMessageError("body checksum does not match")
 		
 		#TODO: check flags
