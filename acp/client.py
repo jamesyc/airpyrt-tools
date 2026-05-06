@@ -8,7 +8,7 @@ from .exception import ACPClientError
 from .message import ACPMessage
 from .property import ACPProperty
 from .session import ACPClientSession
-from .srp import AppleSRPClient, SRP6aClient
+from .srp import SRP6aClient
 
 
 class ACPClient(object):
@@ -258,19 +258,5 @@ class ACPClient(object):
 			)
 			self.session.enable_encryption(session_key, client_iv, server_iv)
 			return session_key, client_iv, server_iv
-		finally:
-			srp_client.close()
-
-
-	def authenticate_AppleSRP(self, srp_client_factory=AppleSRPClient):
-		#XXX: STILL TESTING SHIT
-		username = "admin"
-		srp_client = srp_client_factory(username, self.password)
-		try:
-			return self._authenticate_srp_client(
-				username,
-				srp_client,
-				"authenticate_AppleSRP",
-			)
 		finally:
 			srp_client.close()

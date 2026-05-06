@@ -1,6 +1,5 @@
 import logging
 import struct
-import sys
 from collections import OrderedDict
 
 import pytest
@@ -304,30 +303,3 @@ def test_authenticate_srp_reports_reply_error_code():
 
     with pytest.raises(ACPClientError, match="authenticate_srp failed"):
         client.authenticate_srp(srp_client_factory=FakeSRPClient)
-
-
-def test_importing_client_does_not_load_applesrp_framework(monkeypatch):
-    import acp.client as client_module
-
-    monkeypatch.delitem(sys.modules, "acp.clibs.AppleSRP", raising=False)
-    monkeypatch.delitem(sys.modules, "acp.clibs", raising=False)
-
-    __import__("importlib").reload(client_module)
-
-    assert "acp.clibs.AppleSRP" not in sys.modules
-
-
-def test_authenticate_applesrp_reports_unavailable_framework(monkeypatch):
-    import acp.srp as srp_module
-
-    real_import_module = srp_module.importlib.import_module
-
-    def fake_import_module(name):
-        if name == "acp.clibs.AppleSRP":
-            raise OSError("AppleSRP framework missing")
-        return real_import_module(name)
-
-    monkeypatch.setattr(srp_module.importlib, "import_module", fake_import_module)
-
-    with pytest.raises(ACPClientError, match="private macOS AppleSRP framework"):
-        ACPClient("target", "password").authenticate_AppleSRP()

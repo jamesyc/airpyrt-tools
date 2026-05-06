@@ -207,11 +207,6 @@ def _cmd_extract(args):
     Path(outpath).write_bytes(outdata)
 
 
-def _cmd_srp_test(client, unused):
-    print("SRP testing")
-    client.authenticate_AppleSRP()
-
-
 COMMANDS = {
     "listprop": (LOCAL, _cmd_listprop),
     "helpprop": (LOCAL, _cmd_helpprop),
@@ -226,7 +221,6 @@ COMMANDS = {
     "do_feat_command": (REMOTE_NOAUTH, _cmd_do_feat_command),
     "decrypt": (LOCAL, _cmd_decrypt),
     "extract": (LOCAL, _cmd_extract),
-    "srp_test": (REMOTE_ADMIN, _cmd_srp_test),
 }
 
 
@@ -339,14 +333,6 @@ def build_parser():
         metavar=("inpath", "outpath"),
         nargs=2,
         help="extract the gzimg contents",
-    )
-
-    test_group = parser.add_argument_group("Test arguments")
-    test_group.add_argument(
-        "--srp-test",
-        action="store_const",
-        const=True,
-        help="experimental AppleSRP backend test",
     )
 
     return parser

@@ -17,7 +17,6 @@ class FakeClient:
         self.closed = False
         self.fail_get = fail_get
         self.srp_authenticated = False
-        self.applesrp_authenticated = False
 
     def set_properties(self, props):
         self.props = props
@@ -36,9 +35,6 @@ class FakeClient:
 
     def authenticate_srp(self):
         self.srp_authenticated = True
-
-    def authenticate_AppleSRP(self):
-        self.applesrp_authenticated = True
 
 
 class FakeClientFactory:
@@ -147,23 +143,6 @@ def test_run_srp_auth_mode_requires_admin_password():
     assert "must specify a target and administrator password" in stderr.getvalue()
 
 
-def test_run_srp_test_keeps_experimental_applesrp_backend():
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-    factory = FakeClientFactory()
-
-    status = cli.run(
-        ["--srp-test", "-t", "router", "-p", "password"],
-        client_factory=factory,
-        stdout=stdout,
-        stderr=stderr,
-    )
-
-    assert status == 0
-    assert factory.clients[0].applesrp_authenticated is True
-    assert factory.clients[0].srp_authenticated is False
-
-
 def test_run_closes_remote_client_when_handler_raises():
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -208,17 +187,6 @@ def test_run_parser_errors_return_argparse_status_code():
 
     assert status == 2
     assert "expected 1 argument" in stderr.getvalue()
-
-
-def test_run_help_lists_srp_test_command():
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-
-    status = cli.run(["--help"], stdout=stdout, stderr=stderr)
-
-    assert status == 0
-    assert "Test arguments:" in stdout.getvalue()
-    assert "--srp-test" in stdout.getvalue()
 
 
 def test_run_help_shows_metavars_for_short_and_long_options():

@@ -20,7 +20,7 @@ class _ACPSession(object):
 		self.encrypt_method = None
 		self.decrypt_method = None
 		
-		#XXX: AppleSRP hax
+		#XXX: SRP hax
 		#self.SRP = None
 		#self.state = 0
 	

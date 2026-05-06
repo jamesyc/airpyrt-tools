@@ -41,7 +41,7 @@ python -m pip install -e ".[dev]"
                [--setprop property value] [--dumpprop] [--acpprop] [--dump-syslog]
                [--reboot] [--factory-reset] [--flash-primary firmware_path]
                [--do-feat-command] [--decrypt inpath outpath]
-               [--extract inpath outpath] [--srp-test]
+               [--extract inpath outpath]
 
     options:
       -h, --help            show this help message and exit
@@ -75,10 +75,6 @@ python -m pip install -e ".[dev]"
                             decrypt the basebinary
       --extract inpath outpath
                             extract the gzimg contents
-
-    Test arguments:
-      --srp-test            experimental AppleSRP backend test
-
 
 ### Examples
 
@@ -156,12 +152,6 @@ current Python 3.
 
 Return value of 0xfffffff6 when using --getprop means the property is not
 available/readable.
-
-The AppleSRP ctypes path is experimental and depends on Apple's private macOS
-AppleSRP framework. It remains available through --srp-test for protocol
-experiments. Normal CLI commands use the portable SRP backend when
-`--auth-mode srp` is selected.
-
 
 ## TODO (very incomplete list in no particular order)
 
