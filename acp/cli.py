@@ -131,9 +131,9 @@ def _cmd_acpprop(client, unused):
     if not props_reply:
         raise ACPCommandLineError("router did not return the acpprop list")
     props_raw = props_reply[0].value
-    props = ""
-    for i in range(len(props_raw) // 4):
-        props += f"{props_raw[i * 4 : i * 4 + 4]}\n"
+    props = "\n".join(
+        props_raw[i * 4 : i * 4 + 4] for i in range(len(props_raw) // 4)
+    )
     print(props)
 
 

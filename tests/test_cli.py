@@ -54,7 +54,7 @@ def test_cmd_setprop_converts_bin_hex_input_to_bytes():
 def test_cmd_acpprop_prints_four_character_property_chunks(capsys):
     cli._cmd_acpprop(FakeClient(), None)
 
-    assert capsys.readouterr().out == "abcd\nwxyz\n\n"
+    assert capsys.readouterr().out == "abcd\nwxyz\n"
 
 
 def test_run_listprop_returns_success_and_prints_supported_properties():
