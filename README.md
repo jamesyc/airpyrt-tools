@@ -38,7 +38,7 @@ bytes/text boundaries used by the protocol, firmware, and CLI helpers.
 
 `python [-B] -m acp`
 
-    usage: __main__.py [-h] [-t address] [-p password] [--listprop]
+    usage: acp [-h] [-t address] [-p password] [-v] [--listprop]
                        [--helpprop property] [--getprop property]
                        [--setprop property value] [--dumpprop] [--acpprop]
                        [--dump-syslog] [--reboot] [--factory-reset]
@@ -54,6 +54,7 @@ bytes/text boundaries used by the protocol, firmware, and CLI helpers.
                             IP address or hostname of the target router
       -p password, --password password
                             router admin password
+      -v, --verbose         enable debug logging
 
     AirPort client commands:
       --listprop            list supported properties
@@ -78,6 +79,39 @@ bytes/text boundaries used by the protocol, firmware, and CLI helpers.
 
     Test arguments:
       --srp-test            SRP (requires OS X)
+
+
+### Examples
+
+List supported property names:
+
+```
+acp --listprop
+```
+
+Inspect a supported property:
+
+```
+acp --helpprop syNm
+```
+
+Read or set a router property:
+
+```
+acp --getprop syNm --target 10.0.1.1 --password "$AIRPORT_PASSWORD"
+acp --setprop syNm "Office Router" --target 10.0.1.1 --password "$AIRPORT_PASSWORD"
+```
+
+Work with basebinary firmware files:
+
+```
+acp --decrypt firmware.bin decrypted.bin
+acp --extract decrypted.bin rootfs.img
+```
+
+Commands return a nonzero status and print `error: ...` to stderr when arguments,
+router replies, sockets, or input files fail validation. Add `--verbose` to enable
+debug logging while investigating failures.
 
 
 ### Notes
