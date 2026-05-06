@@ -25,6 +25,9 @@ jobs:
       - name: Run metadata tests
         run: python -m pytest
 
+      - name: Compile package source
+        run: python -m compileall -q acp
+
       - name: Lint packaging scaffold
         run: python -m ruff check setup.py tests
 
