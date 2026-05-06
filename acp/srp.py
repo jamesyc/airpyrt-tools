@@ -163,24 +163,25 @@ class SRP6aClient:
         base = (server_public_key_int - multiplier * verifier_component) % n
         exponent = private_key + scrambling_parameter * x
         premaster_secret_int = pow(base, exponent, n)
-        premaster_secret = _int_to_bytes(premaster_secret_int)
+        premaster_secret = _pad_int(premaster_secret_int, modulus_size)
         session_key = _mgf1_sha1(premaster_secret, 40)
 
-        client_public_key = _int_to_bytes(client_public_key_int)
+        client_public_key = _pad_int(client_public_key_int, modulus_size)
+        server_public_key = _pad_int(server_public_key_int, modulus_size)
         client_proof = _client_proof(
             self.username,
             modulus_bytes,
             generator_bytes,
             salt,
             client_public_key,
-            server_public_key_bytes,
+            server_public_key,
             session_key,
         )
 
-        self.premaster_secret = _pad_int(premaster_secret_int, modulus_size)
+        self.premaster_secret = premaster_secret
         self.session_key = session_key
         self.client_public_key = client_public_key
-        self.server_public_key = server_public_key_bytes
+        self.server_public_key = server_public_key
         self.client_proof = client_proof
         self.expected_server_proof = _server_proof(
             client_public_key,

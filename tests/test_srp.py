@@ -1,3 +1,5 @@
+import hashlib
+
 import pytest
 
 from acp.exception import ACPClientError
@@ -6,6 +8,15 @@ from acp.srp import SRP6aClient
 
 def _unhex(value):
     return bytes.fromhex("".join(value.split()))
+
+
+def _mgf1_sha1(seed, length):
+    output = bytearray()
+    counter = 0
+    while len(output) < length:
+        output += hashlib.sha1(seed + counter.to_bytes(4, "big")).digest()
+        counter += 1
+    return bytes(output[:length])
 
 
 RFC5054_1024_N = """
@@ -68,6 +79,40 @@ def test_srp6a_matches_rfc5054_public_key_and_premaster_secret(assert_hex):
     assert_hex(session_key, STANFORD_SRP_SESSION_KEY)
     assert len(proof) == 20
     assert len(session_key) == 40
+
+
+def test_srp6a_pads_client_public_key_to_modulus_size():
+    client = SRP6aClient("alice", "password123", private_key=1)
+    modulus = _unhex(RFC5054_1024_N)
+
+    public_key, _proof, _session_key = client.process_challenge(
+        modulus,
+        b"\x02",
+        _unhex(RFC5054_SALT),
+        _unhex(RFC5054_B),
+    )
+
+    assert len(public_key) == len(modulus)
+    assert public_key[:-1] == b"\x00" * (len(modulus) - 1)
+    assert public_key[-1:] == b"\x02"
+    assert client.client_public_key == public_key
+
+
+def test_srp6a_pads_premaster_secret_before_session_key_derivation():
+    client = SRP6aClient("alice", "password123", private_key=209)
+    modulus = _unhex(RFC5054_1024_N)
+
+    _public_key, _proof, session_key = client.process_challenge(
+        modulus,
+        b"\x02",
+        _unhex(RFC5054_SALT),
+        _unhex(RFC5054_B),
+    )
+
+    assert len(client.premaster_secret) == len(modulus)
+    assert client.premaster_secret.startswith(b"\x00")
+    assert session_key == _mgf1_sha1(client.premaster_secret, 40)
+    assert session_key != _mgf1_sha1(client.premaster_secret.lstrip(b"\x00"), 40)
 
 
 def test_srp6a_verifies_matching_server_proof():
