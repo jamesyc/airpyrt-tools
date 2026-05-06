@@ -627,9 +627,9 @@ class ACPProperty(object):
 		self.value = value
 	
 	def _init_dec(self, value):
-		if   type(value) == int:
+		if isinstance(value, int):
 			return value
-		elif type(value) == bytes:
+		elif isinstance(value, bytes):
 			try:
 				return struct.unpack("!I", value)[0]
 			except struct.error:
@@ -638,9 +638,9 @@ class ACPProperty(object):
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_hex(self, value):
-		if   type(value) == int:
+		if isinstance(value, int):
 			return value
-		elif type(value) == bytes:
+		elif isinstance(value, bytes):
 			try:
 				return struct.unpack("!I", value)[0]
 			except struct.error:
@@ -649,12 +649,12 @@ class ACPProperty(object):
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_mac(self, value):
-		if type(value) == bytes:
+		if isinstance(value, bytes):
 			# first, try as packed binary value
 			if len(value) == 6:
 				return value
 			raise ACPPropertyInitValueError("invalid value")
-		elif type(value) == str:
+		elif isinstance(value, str):
 			# second, attempt to unpack colon delimited value
 			mac_bytes = value.split(":")
 			if len(mac_bytes) == 6:
@@ -668,28 +668,31 @@ class ACPProperty(object):
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_bin(self, value):
-		if type(value) == bytes:
+		if isinstance(value, bytes):
 			return value
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_cfb(self, value):
-		if type(value) == bytes:
+		if isinstance(value, bytes):
 			return value
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_log(self, value):
-		if type(value) == bytes:
+		if isinstance(value, bytes):
 			return value
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_str(self, value):
-		if type(value) == str:
+		if isinstance(value, str):
 			return value
-		elif type(value) == bytes:
-			return value.decode("utf-8")
+		elif isinstance(value, bytes):
+			try:
+				return value.decode("utf-8")
+			except UnicodeDecodeError:
+				raise ACPPropertyInitValueError("invalid UTF-8 string")
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
@@ -783,13 +786,13 @@ class ACPProperty(object):
 		#XXX: handles "null" name or value first, but this is currently garbage
 		name = cls._name_to_wire(property.name)
 		value = property.value if property.value is not None else cls._null_raw_value
-		if   type(value) == int:
+		if isinstance(value, int):
 			st = struct.Struct(">I")
 			#XXX: this could throw an exception, we need to range check int/hex values to ensure they pack into 32 bits still
 			return cls.compose_raw_element_header(name, flags, st.size) + st.pack(value)
-		elif type(value) == bytes:
+		elif isinstance(value, bytes):
 			return cls.compose_raw_element_header(name, flags, len(value)) + value
-		elif type(value) == str:
+		elif isinstance(value, str):
 			raw_value = value.encode("utf-8")
 			return cls.compose_raw_element_header(name, flags, len(raw_value)) + raw_value
 		else:

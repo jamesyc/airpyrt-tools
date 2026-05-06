@@ -26,6 +26,11 @@ def test_parse_raw_element_for_string_property_decodes_value():
     assert str(prop) == "router"
 
 
+def test_string_property_rejects_malformed_utf8_as_property_error():
+    with pytest.raises(ACPPropertyError, match="invalid UTF-8 string"):
+        ACPProperty.parse_raw_element(b"syNm\x00\x00\x00\x00\x00\x00\x00\x01\xff")
+
+
 def test_integer_property_accepts_wire_bytes_and_composes_big_endian_value():
     prop = ACPProperty("syUT", b"\x00\x00\x00\x2a")
 

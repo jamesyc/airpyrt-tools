@@ -45,18 +45,16 @@ class CFLBinaryPListComposer(object):
 		"""
 		data = bytearray()
 		
-		object_type = type(obj)
-		
-		if	 object_type == type(None):
+		if	 obj is None:
 			data += b"\x00"
 		
-		elif object_type == bool:
+		elif isinstance(obj, bool):
 			if not obj:
 				data += b"\x08"
 			else:
 				data += b"\x09"
 		
-		elif object_type == int:
+		elif isinstance(obj, int):
 			object_marker = 0x10
 			buf = b""
 			#XXX: need to actually catch unsupported packed sizes
@@ -74,7 +72,7 @@ class CFLBinaryPListComposer(object):
 			data.append(object_marker)
 			data += buf
 		
-		elif object_type == float:
+		elif isinstance(obj, float):
 			object_marker = 0x20
 			buf = b""
 			#XXX: need to actually catch unsupported packed sizes
@@ -94,7 +92,7 @@ class CFLBinaryPListComposer(object):
 		
 		#XXX: DateType?
 		
-		elif object_type == bytes:
+		elif isinstance(obj, bytes):
 			object_marker = 0x40
 			data_len = len(obj)
 			if data_len < 0xF:
@@ -106,18 +104,18 @@ class CFLBinaryPListComposer(object):
 				data += cls._pack_object(data_len)
 			data += obj
 		
-		elif object_type == str:
+		elif isinstance(obj, str):
 			data += b"\x70"
 			data += obj.encode("utf-8")
 			data += b"\x00"
 		
-		elif object_type == list:
+		elif isinstance(obj, list):
 			data += b"\xA0"
 			for element in obj:
 				data += cls._pack_object(element)
 			data += b"\x00"
 		
-		elif object_type in [dict, OrderedDict]:
+		elif isinstance(obj, (dict, OrderedDict)):
 			data += b"\xD0"
 			for k, v in obj.items():
 				data += cls._pack_object(k)
