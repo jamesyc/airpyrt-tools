@@ -10,7 +10,7 @@ def _fmt_void_ptr(value):
 def _fmt_cstr(value):
 	if cast(value, c_void_p).value is None:
 		return "<null cstr>"
-	return value.contents.get_data_buffer().encode("hex")
+	return value.contents.get_data_buffer().hex()
 
 def _fmt_ccz_class(value):
 	if cast(value, c_void_p).value is None:
@@ -32,7 +32,7 @@ class cstr(Structure):
 	
 	def __str__(self):
 		s =  "cstr:  {0!r}\n".format(self)
-		s += "data:  {0}\n".format(self.get_data_buffer().encode("hex"))
+		s += "data:  {0}\n".format(self.get_data_buffer().hex())
 		s += "len:   {0}\n".format(self.length)
 		s += "cap:   {0}\n".format(self.cap)
 		s += "ref:   {0}\n".format(self.ref)

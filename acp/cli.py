@@ -2,13 +2,12 @@ import argparse
 import logging
 import os.path
 import sys
-import time
 
 from collections import OrderedDict
 
-from .basebinary import *
+from .basebinary import Basebinary, BasebinaryError
 from .client import ACPClient
-from .exception import *
+from .exception import ACPCommandLineError
 from .property import ACPProperty
 
 
@@ -66,7 +65,7 @@ def _cmd_setprop(client, args):
 		#XXX: not catching our exception
 		prop = ACPProperty(prop_name, prop_value)
 	elif prop_type == "bin":
-		prop = ACPProperty(prop_name, prop_value.decode("hex"))
+		prop = ACPProperty(prop_name, bytes.fromhex(prop_value))
 	elif prop_type == "str":
 		prop = ACPProperty(prop_name, prop_value)
 	elif prop_type in ["cfb", "log"]:

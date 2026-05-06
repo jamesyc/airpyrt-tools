@@ -3,7 +3,28 @@ import struct
 import zlib
 
 from .exception import ACPMessageError
-from .keystream import *
+from .keystream import generate_acp_keystream
+
+
+def _as_bytes(value):
+	if value is None:
+		return None
+	if isinstance(value, bytes):
+		return value
+	if isinstance(value, str):
+		return value.encode("utf-8")
+	raise TypeError("expected str or bytes")
+
+
+def _signed_i32(value):
+	value &= 0xFFFFFFFF
+	if value > 0x7FFFFFFF:
+		return value - 0x100000000
+	return value
+
+
+def _adler32_i32(data):
+	return _signed_i32(zlib.adler32(data))
 
 
 def _generate_acp_header_key(password):
@@ -17,19 +38,19 @@ def _generate_acp_header_key(password):
 		password (str): system password of the router (syAP)
 	
 	Returns:
-		String containing encrypted password of proper length for the header field
+		Bytes containing encrypted password of proper length for the header field
 	
 	"""
 	pw_len = 0x20
 	pw_key = generate_acp_keystream(pw_len)
 	
 	# pad with NULLs
-	pw_buf = password[:pw_len].ljust(pw_len, "\x00")
-	enc_pw_buf = ""
+	pw_buf = _as_bytes(password)[:pw_len].ljust(pw_len, b"\x00")
+	enc_pw_buf = bytearray()
 	for i in range(pw_len):
-		enc_pw_buf += chr(ord(pw_key[i]) ^ ord(pw_buf[i]))	
+		enc_pw_buf.append(pw_key[i] ^ pw_buf[i])
 	
-	return enc_pw_buf
+	return bytes(enc_pw_buf)
 
 
 class ACPMessage(object):
@@ -38,7 +59,7 @@ class ACPMessage(object):
 	#XXX: struct is stupid about unpacking unsigned ints > 0x7fffffff, so treat everything as signed and
 	#     "cast" where necessary. Should we switch to using ctypes?
 	_header_format = struct.Struct("!4s8i12x32s48x")
-	_header_magic  = "acpp"
+	_header_magic  = b"acpp"
 	
 	header_size = _header_format.size
 	
@@ -54,11 +75,12 @@ class ACPMessage(object):
 		if body == None:
 			# the body size is already specified, don't override it
 			self.body_size = body_size if body_size != None else -1
-			self.body_checksum = 1 # equivalent to zlib.adler32("")
+			self.body_checksum = 1 # equivalent to zlib.adler32(b"")
 		else:
+			body = _as_bytes(body)
 			# the body size is already specified, don't override it
 			self.body_size = body_size if body_size != None else len(body)
-			self.body_checksum = zlib.adler32(body)
+			self.body_checksum = _adler32_i32(body)
 		
 		self.key = key
 		self.body = body
@@ -81,6 +103,7 @@ class ACPMessage(object):
 		# bail early if there is not enough data
 		if len(data) < cls.header_size:
 			raise ACPMessageError("need to pass at least {0} bytes".format(cls.header_size))
+		data = _as_bytes(data)
 		header_data = data[:cls.header_size]
 		# make sure there's data beyond the header before we try to access it
 		body_data = data[cls.header_size:] if len(data) > cls.header_size else None
@@ -105,7 +128,7 @@ class ACPMessage(object):
 		
 		#TODO: can we zero the header_checksum field without recreating the struct (how?)
 		tmphdr = cls._header_format.pack(magic, version, 0, body_checksum, body_size, flags, unused, command, error_code, key)
-		if header_checksum != zlib.adler32(tmphdr):
+		if header_checksum != _adler32_i32(tmphdr):
 			raise ACPMessageError("header checksum does not match")
 		
 		if body_data and body_size == -1:
@@ -114,7 +137,7 @@ class ACPMessage(object):
 		if body_data and body_size != len(body_data):
 			raise ACPMessageError("message body size does not match available data")
 		
-		if body_data and body_checksum != zlib.adler32(body_data):
+		if body_data and body_checksum != _adler32_i32(body_data):
 			raise ACPMessageError("body checksum does not match")
 		
 		#TODO: check flags
@@ -193,7 +216,7 @@ class ACPMessage(object):
 		"""Compose a request from the client to ACP daemon
 		
 		Returns:
-			String containing message to send
+			Bytes containing message to send
 		
 		"""
 		reply = self._compose_header()
@@ -207,7 +230,7 @@ class ACPMessage(object):
 		"""Compose the message header
 		
 		Returns:
-			String containing header data
+			Bytes containing header data
 		
 		"""
 		tmphdr = self._header_format.pack(self._header_magic,
@@ -223,7 +246,7 @@ class ACPMessage(object):
 		
 		header = self._header_format.pack(self._header_magic,
 		                                  self.version,
-		                                  zlib.adler32(tmphdr),
+		                                  _adler32_i32(tmphdr),
 		                                  self.body_checksum,
 		                                  self.body_size,
 		                                  self.flags,

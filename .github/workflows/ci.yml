@@ -19,8 +19,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install development tools
-        run: python -m pip install -U pip build pytest ruff
+      - name: Install project and development tools
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ".[dev]"
 
       - name: Run metadata tests
         run: python -m pytest
@@ -34,8 +36,8 @@ jobs:
       - name: Build distributions
         run: python -m build
 
-      - name: Install wheel without byte-compiling legacy Python 2 source
-        run: python -m pip install --no-compile dist/*.whl
+      - name: Install wheel
+        run: python -m pip install --force-reinstall dist/*.whl
 
       - name: Check installed dependencies
         run: python -m pip check

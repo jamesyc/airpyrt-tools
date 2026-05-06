@@ -4,8 +4,8 @@ from collections import OrderedDict
 from math  import log
 
 
-_header_magic = "CFB0"
-_footer_magic = "END!"
+_header_magic = b"CFB0"
+_footer_magic = b"END!"
 _header_size = len(_header_magic)
 _footer_size = len(_footer_magic)
 
@@ -43,22 +43,20 @@ class CFLBinaryPListComposer(object):
 		Raises:
 			CFLBinaryPListComposeError
 		"""
-		data = ""
+		data = bytearray()
 		
-		object_type = type(obj)
+		if	 obj is None:
+			data += b"\x00"
 		
-		if	 object_type == type(None):
-			data += "\x00"
-		
-		elif object_type == bool:
+		elif isinstance(obj, bool):
 			if not obj:
-				data += "\x08"
+				data += b"\x08"
 			else:
-				data += "\x09"
+				data += b"\x09"
 		
-		elif object_type == int:
+		elif isinstance(obj, int):
 			object_marker = 0x10
-			buf = ""
+			buf = b""
 			#XXX: need to actually catch unsupported packed sizes
 			for fmt in [">B", ">H", ">I", ">Q"]:
 				try:
@@ -71,12 +69,12 @@ class CFLBinaryPListComposer(object):
 			
 			object_marker += int(log(len(buf), 2))
 			
-			data += chr(object_marker)
+			data.append(object_marker)
 			data += buf
 		
-		elif object_type == float:
+		elif isinstance(obj, float):
 			object_marker = 0x20
-			buf = ""
+			buf = b""
 			#XXX: need to actually catch unsupported packed sizes
 			for fmt in ["!f", "!d"]:
 				try:
@@ -89,45 +87,45 @@ class CFLBinaryPListComposer(object):
 			
 			object_marker += int(log(len(buf), 2))
 			
-			data += chr(object_marker)
+			data.append(object_marker)
 			data += buf
 		
 		#XXX: DateType?
 		
-		elif object_type == bytes:
+		elif isinstance(obj, bytes):
 			object_marker = 0x40
 			data_len = len(obj)
 			if data_len < 0xF:
 				object_marker += data_len
-				data += chr(object_marker)
+				data.append(object_marker)
 			else:
 				object_marker += 0xF
-				data += chr(object_marker)
+				data.append(object_marker)
 				data += cls._pack_object(data_len)
 			data += obj
 		
-		elif object_type == str:
-			data += "\x70"
+		elif isinstance(obj, str):
+			data += b"\x70"
 			data += obj.encode("utf-8")
-			data += "\x00"
+			data += b"\x00"
 		
-		elif object_type == list:
-			data += "\xA0"
+		elif isinstance(obj, list):
+			data += b"\xA0"
 			for element in obj:
 				data += cls._pack_object(element)
-			data += "\x00"
+			data += b"\x00"
 		
-		elif object_type in [dict, OrderedDict]:
-			data += "\xD0"
+		elif isinstance(obj, (dict, OrderedDict)):
+			data += b"\xD0"
 			for k, v in obj.items():
 				data += cls._pack_object(k)
 				data += cls._pack_object(v)
-			data += "\x00"
+			data += b"\x00"
 		
 		else:
 			raise CFLBinaryPListComposeError("unsupported Python built-in type: {0}".format(type(obj)))
 		
-		return data
+		return bytes(data)
 	
 	@classmethod
 	def compose(cls, object):
@@ -139,11 +137,11 @@ class CFLBinaryPListComposer(object):
 		Raises:
 			CFLBinaryPListComposeError
 		"""
-		data =  _header_magic
+		data = bytearray(_header_magic)
 		# assume one root object
 		data += cls._pack_object(object)
 		data += _footer_magic
-		return data
+		return bytes(data)
 
 
 class CFLBinaryPListParser(object):
@@ -239,13 +237,12 @@ class CFLBinaryPListParser(object):
 		Raises:
 			CFLBinaryPListParseError
 		"""
-		marker_byte, data = _lslice(data, 1)
 		try:
-			(marker, ) = struct.unpack(">B", marker_byte)
-		except struct.error:
+			marker = data[0]
+		except IndexError:
 			raise CFLBinaryPListParseError("failed to unpack object marker")
 		
-		return marker, data
+		return marker, data[1:]
 	
 	@classmethod
 	def _unpack_object(cls, data):
@@ -295,14 +292,18 @@ class CFLBinaryPListParser(object):
 			raise CFLBinaryPListParseError("Unicode string support not implemented")
 		
 		elif object_type == 0x70:     # string, UTF8, NULL terminated
-			raw = ""
+			raw = bytearray()
 			while True:
 				byte, data = _lslice(data, 1)
-				if byte == "\x00":
+				if byte == b"":
+					raise CFLBinaryPListParseError("unterminated UTF-8 string")
+				if byte == b"\x00":
 					break
 				raw += byte
-			#XXX: what exceptions could we get here?
-			obj = raw.decode("utf-8")
+			try:
+				obj = bytes(raw).decode("utf-8")
+			except UnicodeDecodeError:
+				raise CFLBinaryPListParseError("failed to decode UTF-8 string")
 			return obj, data
 		
 		elif object_type == 0x80:      # uid
