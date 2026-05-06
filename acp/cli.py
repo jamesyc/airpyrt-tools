@@ -13,6 +13,8 @@ from .property import ACPProperty
 LOCAL = "local"
 REMOTE_NOAUTH = "remote_noauth"
 REMOTE_ADMIN = "remote_admin"
+AUTH_LEGACY = "legacy"
+AUTH_SRP = "srp"
 
 
 class _ArgParser(argparse.ArgumentParser):
@@ -250,6 +252,12 @@ def build_parser():
         action="store_true",
         help="enable debug logging",
     )
+    parameters_group.add_argument(
+        "--auth-mode",
+        choices=[AUTH_LEGACY, AUTH_SRP],
+        default=AUTH_LEGACY,
+        help="remote authentication mode",
+    )
 
     airport_client_group = parser.add_argument_group("AirPort client commands")
     airport_client_group.add_argument(
@@ -338,7 +346,7 @@ def build_parser():
         "--srp-test",
         action="store_const",
         const=True,
-        help="SRP (requires OS X)",
+        help="experimental AppleSRP backend test",
     )
 
     return parser
@@ -365,12 +373,16 @@ def _run_local(handler, arg):
     handler(arg)
 
 
-def _run_remote(handler, arg, mode, target, password, client_factory):
-    if mode == REMOTE_NOAUTH:
+def _run_remote(handler, arg, mode, target, password, auth_mode, client_factory):
+    if auth_mode == AUTH_SRP:
+        if target is None or password is None:
+            raise ACPCommandLineError("must specify a target and administrator password")
+        client = client_factory(target, password)
+    elif mode == REMOTE_NOAUTH:
         if target is None:
             raise ACPCommandLineError("must specify a target")
         client = client_factory(target)
-    elif mode == REMOTE_ADMIN:
+    elif auth_mode == AUTH_LEGACY and mode == REMOTE_ADMIN:
         if target is None or password is None:
             raise ACPCommandLineError("must specify a target and administrator password")
         client = client_factory(target, password)
@@ -379,6 +391,8 @@ def _run_remote(handler, arg, mode, target, password, client_factory):
 
     try:
         client.connect()
+        if auth_mode == AUTH_SRP:
+            client.authenticate_srp()
         handler(client, arg)
     finally:
         client.close()
@@ -404,6 +418,7 @@ def _run_args(args, client_factory):
             mode,
             args.target,
             args.password,
+            args.auth_mode,
             client_factory,
         )
 

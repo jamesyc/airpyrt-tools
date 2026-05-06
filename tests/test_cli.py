@@ -16,6 +16,8 @@ class FakeClient:
         self.connected = False
         self.closed = False
         self.fail_get = fail_get
+        self.srp_authenticated = False
+        self.applesrp_authenticated = False
 
     def set_properties(self, props):
         self.props = props
@@ -31,6 +33,12 @@ class FakeClient:
 
     def close(self):
         self.closed = True
+
+    def authenticate_srp(self):
+        self.srp_authenticated = True
+
+    def authenticate_AppleSRP(self):
+        self.applesrp_authenticated = True
 
 
 class FakeClientFactory:
@@ -90,6 +98,70 @@ def test_run_requires_remote_admin_target_and_password():
 
     assert status == 1
     assert "must specify a target and administrator password" in stderr.getvalue()
+
+
+def test_run_uses_legacy_auth_mode_by_default():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--acpprop", "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 0
+    assert factory.clients[0].srp_authenticated is False
+
+
+def test_run_srp_auth_mode_authenticates_before_remote_command():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--acpprop", "-t", "router", "-p", "password", "--auth-mode", "srp"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 0
+    assert factory.clients[0].srp_authenticated is True
+    assert stdout.getvalue() == "abcd\nwxyz\n"
+
+
+def test_run_srp_auth_mode_requires_admin_password():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(
+        ["--do-feat-command", "-t", "router", "--auth-mode", "srp"],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 1
+    assert "must specify a target and administrator password" in stderr.getvalue()
+
+
+def test_run_srp_test_keeps_experimental_applesrp_backend():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--srp-test", "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 0
+    assert factory.clients[0].applesrp_authenticated is True
+    assert factory.clients[0].srp_authenticated is False
 
 
 def test_run_closes_remote_client_when_handler_raises():
@@ -158,6 +230,7 @@ def test_run_help_shows_metavars_for_short_and_long_options():
     assert status == 0
     assert "-t address, --target address" in stdout.getvalue()
     assert "-p password, --password password" in stdout.getvalue()
+    assert "--auth-mode {legacy,srp}" in stdout.getvalue()
 
 
 def test_run_reconfigures_logging_for_each_stderr_stream(monkeypatch):
