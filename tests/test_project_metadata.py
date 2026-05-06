@@ -37,6 +37,9 @@ def test_readme_documents_supported_python_and_release_workflow():
     assert "python -m build" in readme
     assert "python -m twine check dist/*" in readme
     assert "python -m acp --help" in readme
+    assert "usage: acp [-h] [-t address] [-p password] [-v] [--listprop]" in readme
+    assert "--flash-primary firmware_path" in readme
+    assert "Basebinary commands:" in readme
     assert (
         "SRP/protocol v2 authentication and full session encryption are not implemented"
         in readme

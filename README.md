@@ -74,6 +74,47 @@ The module entrypoint is equivalent:
 python -m acp --help
 ```
 
+### Command Reference
+
+```text
+usage: acp [-h] [-t address] [-p password] [-v] [--listprop]
+           [--helpprop property] [--getprop property]
+           [--setprop property value] [--dumpprop] [--acpprop] [--dump-syslog]
+           [--reboot] [--factory-reset] [--flash-primary firmware_path]
+           [--do-feat-command] [--decrypt inpath outpath]
+           [--extract inpath outpath]
+
+options:
+  -h, --help            show this help message and exit
+
+AirPort client parameters:
+  -t, --target address  IP address or hostname of the target router
+  -p, --password password
+                        router admin password
+  -v, --verbose         enable debug logging
+
+AirPort client commands:
+  --listprop            list supported properties
+  --helpprop property   print the description of the specified property
+  --getprop property    get the value of the specified property
+  --setprop property value
+                        set the value of the specified property
+  --dumpprop            dump values of all supported properties
+  --acpprop             get acp acpprop list
+  --dump-syslog         dump the router system log
+  --reboot              reboot device
+  --factory-reset       RESET EVERYTHING and reboot; you have been warned!
+  --flash-primary firmware_path
+                        flash primary partition firmware
+  --do-feat-command     send 0x1b (feat) command
+
+Basebinary commands:
+  --decrypt inpath outpath
+                        decrypt the basebinary
+  --extract inpath outpath
+                        extract the gzimg contents
+```
+
 Common examples:
 
 ```bash
