@@ -20,6 +20,23 @@ class _ArgParser(argparse.ArgumentParser):
         self.exit(2, f"error: {message}\n")
 
 
+class _HelpFormatter(argparse.HelpFormatter):
+    def _format_action_invocation(self, action):
+        if not action.option_strings:
+            default = self._get_default_metavar_for_positional(action)
+            (metavar,) = self._metavar_formatter(action, default)(1)
+            return metavar
+
+        if action.nargs == 0:
+            return ", ".join(action.option_strings)
+
+        default = self._get_default_metavar_for_optional(action)
+        args_string = self._format_args(action, default)
+        return ", ".join(
+            f"{option_string} {args_string}" for option_string in action.option_strings
+        )
+
+
 def _cmd_not_implemented(*unused):
     raise ACPCommandLineError("command handler not implemented")
 
@@ -212,7 +229,7 @@ COMMANDS = {
 
 
 def build_parser():
-    parser = _ArgParser(prog="acp")
+    parser = _ArgParser(prog="acp", formatter_class=_HelpFormatter)
 
     parameters_group = parser.add_argument_group("AirPort client parameters")
     parameters_group.add_argument(

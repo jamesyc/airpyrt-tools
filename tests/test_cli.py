@@ -138,6 +138,28 @@ def test_run_parser_errors_return_argparse_status_code():
     assert "expected 1 argument" in stderr.getvalue()
 
 
+def test_run_help_lists_srp_test_command():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(["--help"], stdout=stdout, stderr=stderr)
+
+    assert status == 0
+    assert "Test arguments:" in stdout.getvalue()
+    assert "--srp-test" in stdout.getvalue()
+
+
+def test_run_help_shows_metavars_for_short_and_long_options():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(["--help"], stdout=stdout, stderr=stderr)
+
+    assert status == 0
+    assert "-t address, --target address" in stdout.getvalue()
+    assert "-p password, --password password" in stdout.getvalue()
+
+
 def test_run_reconfigures_logging_for_each_stderr_stream(monkeypatch):
     def handler(unused):
         logging.warning("handler warning")

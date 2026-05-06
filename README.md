@@ -7,13 +7,14 @@ See LICENSE
 
 ### Requirements
 
-- Modernization in progress; target runtime is Python 3.11+
+- Python 3.11 or newer
+- Tested on Python 3.11 through 3.14
 - pycryptodomex
 
 
 ### Installation
 
-During modernization, install from the project root:
+`pipx install .`
 
 `python -m pip install .`
 
@@ -24,29 +25,26 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -e ".[dev]"
-python -m coverage run -m pytest
-python -m coverage report
-python -m build
-python -m twine check dist/*
 ```
-
-The project is being modernized for Python 3. The test suite now covers the core
-bytes/text boundaries used by the protocol, firmware, and CLI helpers.
 
 
 ### Usage
 
-`python [-B] -m acp`
+`acp`
+
+`python -m acp`
+
+`python -m acp --help`
 
     usage: acp [-h] [-t address] [-p password] [-v] [--listprop]
-                       [--helpprop property] [--getprop property]
-                       [--setprop property value] [--dumpprop] [--acpprop]
-                       [--dump-syslog] [--reboot] [--factory-reset]
-                       [--flash-primary firmware_path] [--do-feat-command]
-                       [--decrypt inpath outpath] [--extract inpath outpath]
-                       [--srp-test]
+               [--helpprop property] [--getprop property]
+               [--setprop property value] [--dumpprop] [--acpprop]
+               [--dump-syslog] [--reboot] [--factory-reset]
+               [--flash-primary firmware_path] [--do-feat-command]
+               [--decrypt inpath outpath] [--extract inpath outpath]
+               [--srp-test]
 
-    optional arguments:
+    options:
       -h, --help            show this help message and exit
 
     AirPort client parameters:
@@ -114,28 +112,49 @@ router replies, sockets, or input files fail validation. Add `--verbose` to enab
 debug logging while investigating failures.
 
 
+### Development
+
+```
+python -m pytest
+python -m coverage run -m pytest
+python -m coverage report
+python -m ruff check acp/cli.py setup.py tests
+python -m compileall -q acp
+python -m build
+python -m twine check dist/*
+python -m pip install --force-reinstall dist/*.whl
+python -m pip check
+```
+
+The current ruff target covers the package entrypoint, packaging shim, and tests.
+The older protocol modules still need a separate whole-package lint cleanup pass.
+
+
 ### Notes
 
 **IMPORTANT**
 
 This still uses the old ACP protocol implementation, which puts the admin password
-of the device over the wire in a trivially recoverable format. This was fixed by 
-in the new protocol which uses SRP authentication and better encryption of requests
-to/from the device. Until this is implemented this tool is entirely unsafe to use,
-especially for remote administration (which you should have disabled anyway...).
+of the device over the wire in a trivially recoverable format. The newer protocol
+uses SRP authentication and better encryption of requests to/from the device.
+Until SRP/protocol v2 authentication and full session encryption are implemented,
+remote administration with this tool should be treated as unsafe on untrusted
+networks.
 
-This project grew organically out of my understanding of various pieces of the ACP 
-protocol. I've restructured the code a few times as it has improved, but there are 
-still many gaps in the implementation, and a lot of code smell. Between sitting on
-this indefinitely making incremental improvements (and probably never releasing a 
-"finished" product) and releasing it in a rougher state for others to explore, the
-latter made far more sense.
+The original project grew organically out of the author's understanding of various
+pieces of the ACP protocol. It was restructured a few times as that understanding
+improved, but there are still gaps in the implementation and some code smell.
+This fork keeps that exploratory history intact while modernizing the package for
+current Python 3.
 
-Return value of 0xfffffff6 when using --getprop means the property is not avaliable/readable
+Return value of 0xfffffff6 when using --getprop means the property is not
+available/readable.
 
 The AppleSRP ctypes path is experimental and depends on Apple's private macOS
-AppleSRP framework. It is reported as unavailable on systems where that framework
-cannot be imported; portable SRP support is still future work.
+AppleSRP framework. It remains available through --srp-test for protocol
+experiments; portable SRP support is still future work.
+
+SRP/protocol v2 authentication and full session encryption are not implemented.
 
 
 ## TODO (very incomplete list in no particular order)
