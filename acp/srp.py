@@ -71,17 +71,14 @@ def _calculate_u(client_public_key, server_public_key, modulus_size):
     )
 
 
-def _interleaved_sha1(secret):
-    data = _int_to_bytes(secret).lstrip(b"\x00")
-    if len(data) % 2:
-        data = data[1:]
-
-    even_hash = _sha1(data[::2])
-    odd_hash = _sha1(data[1::2])
-    return b"".join(
-        even_hash[index : index + 1] + odd_hash[index : index + 1]
-        for index in range(len(even_hash))
-    )
+def _mgf1_sha1(seed, length):
+    # AppleSRP's Stanford-derived SRP6a backend returns RFC2945_KEY_LEN bytes here.
+    output = bytearray()
+    counter = 0
+    while len(output) < length:
+        output += _sha1(seed, counter.to_bytes(4, "big"))
+        counter += 1
+    return bytes(output[:length])
 
 
 def _client_proof(
@@ -157,7 +154,7 @@ class SRP6aClient:
             raise ACPClientError("SRP modulus must be positive")
         if g <= 1:
             raise ACPClientError("SRP generator must be greater than one")
-        if server_public_key_int % n == 0:
+        if server_public_key_int == 0 or server_public_key_int >= n:
             raise ACPClientError("SRP server public key must not be zero modulo N")
 
         modulus_size = len(modulus_bytes)
@@ -180,24 +177,24 @@ class SRP6aClient:
         base = (server_public_key_int - multiplier * verifier_component) % n
         exponent = private_key + scrambling_parameter * x
         premaster_secret_int = pow(base, exponent, n)
-        session_key = _interleaved_sha1(premaster_secret_int)
+        premaster_secret = _int_to_bytes(premaster_secret_int)
+        session_key = _mgf1_sha1(premaster_secret, 40)
 
-        client_public_key = _pad_int(client_public_key_int, modulus_size)
-        server_public_key = _pad_int(server_public_key_int, modulus_size)
+        client_public_key = _int_to_bytes(client_public_key_int)
         client_proof = _client_proof(
             self.username,
             modulus_bytes,
             generator_bytes,
             salt,
             client_public_key,
-            server_public_key,
+            server_public_key_bytes,
             session_key,
         )
 
         self.premaster_secret = _pad_int(premaster_secret_int, modulus_size)
         self.session_key = session_key
         self.client_public_key = client_public_key
-        self.server_public_key = server_public_key
+        self.server_public_key = server_public_key_bytes
         self.client_proof = client_proof
         self.expected_server_proof = _server_proof(
             client_public_key,

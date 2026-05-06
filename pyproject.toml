@@ -45,6 +45,9 @@ include = ["acp", "acp.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live_device: tests that connect to a real ACP device",
+]
 
 [tool.coverage.run]
 branch = true

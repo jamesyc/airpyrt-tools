@@ -47,6 +47,11 @@ RFC5054_PREMASTER_SECRET = """
     C346D7E4 74B29EDE 8A469FFE CA686E5A
 """
 
+STANFORD_SRP_SESSION_KEY = """
+    44EBB4AB 646ABBB1 23287F37 6DB03FE0 EEB92902 9C2ED935 925C128C
+    CA3808A6 F22D00AD D6BBAE62
+"""
+
 
 def test_srp6a_matches_rfc5054_public_key_and_premaster_secret(assert_hex):
     client = SRP6aClient("alice", "password123", private_key=_unhex(RFC5054_A_SECRET))
@@ -60,6 +65,7 @@ def test_srp6a_matches_rfc5054_public_key_and_premaster_secret(assert_hex):
 
     assert_hex(public_key, RFC5054_A)
     assert_hex(client.premaster_secret, RFC5054_PREMASTER_SECRET)
+    assert_hex(session_key, STANFORD_SRP_SESSION_KEY)
     assert len(proof) == 20
     assert len(session_key) == 40
 

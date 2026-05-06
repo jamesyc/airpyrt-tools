@@ -165,6 +165,19 @@ class FakeSRPClient:
         self.closed = True
 
 
+class PassthroughEncryption:
+    def __init__(self, key, client_iv, server_iv):
+        self.key = key
+        self.client_iv = client_iv
+        self.server_iv = server_iv
+
+    def client_encrypt(self, data):
+        return data
+
+    def server_decrypt(self, data):
+        return data
+
+
 def test_get_properties_uses_fake_server_and_parses_chunked_property_reply():
     server = FakeACPServer(get_props=[ACPProperty("syNm", "router")], max_chunk=3)
     client = client_with_fake_server(server)
@@ -256,7 +269,25 @@ def test_authenticate_srp_exchanges_auth_plists(monkeypatch):
         b"\x08",
     )
     assert instances[0].server_proof == b"server-proof"
+    assert client.session.encrypt_method is not None
+    assert client.session.decrypt_method is not None
     assert instances[0].closed is True
+
+
+def test_authenticate_srp_enables_encrypted_session_for_followup_reads(monkeypatch):
+    monkeypatch.setattr("acp.client.os.urandom", lambda size: b"client-iv-123456")
+    monkeypatch.setattr("acp.session.ACPEncryption", PassthroughEncryption)
+    server = FakeACPServer(get_props=[ACPProperty("syNm", "router")])
+    client = client_with_fake_server(server)
+
+    client.authenticate_srp(srp_client_factory=FakeSRPClient)
+    props = client.get_properties(["syNm"])
+
+    assert props[0].value == "router"
+    assert client.session.encryption_context.key == b"session-key"
+    assert client.session.encryption_context.client_iv == b"client-iv-123456"
+    assert client.session.encryption_context.server_iv == b"server-iv-123456"
+    assert [request.command for request in server.requests] == [0x1A, 0x1A, 0x14]
 
 
 def test_authenticate_srp_reports_missing_challenge_field():

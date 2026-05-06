@@ -251,11 +251,13 @@ class ACPClient(object):
 	def authenticate_srp(self, username="admin", srp_client_factory=SRP6aClient):
 		srp_client = srp_client_factory(username, self.password)
 		try:
-			return self._authenticate_srp_client(
+			session_key, client_iv, server_iv = self._authenticate_srp_client(
 				username,
 				srp_client,
 				"authenticate_srp",
 			)
+			self.session.enable_encryption(session_key, client_iv, server_iv)
+			return session_key, client_iv, server_iv
 		finally:
 			srp_client.close()
 
