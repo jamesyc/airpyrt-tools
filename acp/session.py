@@ -70,12 +70,12 @@ class _ACPSession(object):
 		recvd_chunks = []
 		recvd_size = 0
 		
-		deadline = time.time() + timeout
+		deadline = time.monotonic() + timeout
 		try:
 			while True:
 				if recvd_size == size:
 					break
-				if time.time() >= deadline:
+				if time.monotonic() >= deadline:
 					raise ACPSessionError(
 						"timed out before receiving {0} bytes".format(size)
 					)

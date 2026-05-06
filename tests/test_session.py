@@ -60,6 +60,8 @@ def test_recv_timeout_restores_blocking_mode(monkeypatch):
         def recv(self, size):
             raise BlockingIOError
 
+    monotonic_times = iter([0.0, 0.0, 0.002])
+    monkeypatch.setattr(session.time, "monotonic", lambda: next(monotonic_times))
     monkeypatch.setattr(session.time, "sleep", lambda _seconds: None)
     acp_session = _ACPSession("target", "password")
     acp_session.sock = BlockingSocket()
