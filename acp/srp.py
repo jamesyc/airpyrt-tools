@@ -199,4 +199,12 @@ class SRP6aClient:
         return True
 
     def close(self):
-        return None
+        self.username = None
+        self.password = None
+        self.private_key = None
+        self.premaster_secret = None
+        self.session_key = None
+        self.client_public_key = None
+        self.server_public_key = None
+        self.client_proof = None
+        self.expected_server_proof = None

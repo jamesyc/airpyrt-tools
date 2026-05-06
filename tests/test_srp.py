@@ -127,6 +127,38 @@ def test_srp6a_verifies_matching_server_proof():
     assert client.verify_server_proof(client.expected_server_proof) is True
 
 
+def test_srp6a_close_clears_sensitive_instance_state():
+    client = SRP6aClient("alice", "password123", private_key=_unhex(RFC5054_A_SECRET))
+    client.process_challenge(
+        _unhex(RFC5054_1024_N),
+        b"\x02",
+        _unhex(RFC5054_SALT),
+        _unhex(RFC5054_B),
+    )
+
+    assert client.password is not None
+    assert client.private_key is not None
+    assert client.premaster_secret is not None
+    assert client.session_key is not None
+    assert client.expected_server_proof is not None
+
+    client.close()
+    client.close()
+
+    for attr in [
+        "username",
+        "password",
+        "private_key",
+        "premaster_secret",
+        "session_key",
+        "client_public_key",
+        "server_public_key",
+        "client_proof",
+        "expected_server_proof",
+    ]:
+        assert getattr(client, attr) is None
+
+
 def test_srp6a_rejects_wrong_server_proof():
     client = SRP6aClient("alice", "password123", private_key=_unhex(RFC5054_A_SECRET))
     client.process_challenge(
