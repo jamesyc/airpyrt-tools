@@ -41,9 +41,11 @@ class ACPClient(object):
 		return self.recv(ACPProperty.element_header_size)
 	
 	
-	def get_properties(self, prop_names=[]):
+	def get_properties(self, prop_names=None):
+		if prop_names is None:
+			prop_names = []
 		# request property by sending name and "null" value
-		payload = ""
+		payload = b""
 		for name in prop_names:
 			payload += ACPProperty.compose_raw_element(0, ACPProperty(name))
 		
@@ -88,8 +90,10 @@ class ACPClient(object):
 		return props
 	
 	
-	def set_properties(self, props_dict={}):
-		payload = ""
+	def set_properties(self, props_dict=None):
+		if props_dict is None:
+			props_dict = {}
+		payload = b""
 		for name, prop in props_dict.items():
 			logging.debug("prop: {0!r}".format(prop))
 			payload += ACPProperty.compose_raw_element(0, prop)
@@ -150,7 +154,8 @@ class ACPClient(object):
 		from .clibs import AppleSRP
 		from collections import OrderedDict		
 		
-		username = u"admin"
+		username = "admin"
+		username_bytes = username.encode("utf-8")
 		
 		dic = OrderedDict([(u"state", 1), (u"username", username)])
 		payload = CFLBinaryPListComposer.compose(dic)
@@ -176,20 +181,20 @@ class ACPClient(object):
 		salt = params1[u"salt"]
 		server_pkey = params1[u"publicKey"]
 		
-		nhex = n.encode("hex")
-		ghex = g.encode("hex")
+		nhex = n.hex()
+		ghex = g.hex()
 		
 		logging.debug("nhex: {0}".format(nhex))
 		logging.debug("ghex: {0}".format(ghex))
-		logging.debug("salt: {0}".format(salt.encode("hex")))
-		logging.debug("server_pkey: {0}".format(server_pkey.encode("hex")))
+		logging.debug("salt: {0}".format(salt.hex()))
+		logging.debug("server_pkey: {0}".format(server_pkey.hex()))
 		
 		# create SRP context
 		asrp = AppleSRP.SRP_new(AppleSRP.SRP6a_client_method())
 		#logging.debug(asrp.contents)
 		
 		# set username
-		logging.debug("SRP_set_username: {0}".format(AppleSRP.SRP_set_username(asrp, username)))
+		logging.debug("SRP_set_username: {0}".format(AppleSRP.SRP_set_username(asrp, username_bytes)))
 		#logging.debug(asrp.contents)
 		
 		# set parameters from server
@@ -204,7 +209,8 @@ class ACPClient(object):
 		#logging.debug(asrp.contents)
 
 		# set password
-		logging.debug("SRP_set_auth_password: {0}".format(AppleSRP.SRP_set_auth_password(asrp, self.password, len(self.password))))
+		password = self.password.encode("utf-8") if isinstance(self.password, str) else self.password
+		logging.debug("SRP_set_auth_password: {0}".format(AppleSRP.SRP_set_auth_password(asrp, password, len(password))))
 		#logging.debug(asrp.contents)
 		
 		# compute key

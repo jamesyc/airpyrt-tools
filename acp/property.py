@@ -570,13 +570,36 @@ class ACPProperty(object):
 	
 	_element_header_format = struct.Struct("!4s2I")
 	element_header_size = _element_header_format.size
+	_null_raw_value = b"\x00\x00\x00\x00"
+
+	@staticmethod
+	def _name_to_wire(name):
+		if name is None:
+			return ACPProperty._null_raw_value
+		if isinstance(name, bytes):
+			raw_name = name
+		elif isinstance(name, str):
+			raw_name = name.encode("ascii")
+		else:
+			raise ACPPropertyError("property name must be str or bytes")
+		if len(raw_name) != 4:
+			raise ACPPropertyError("property name must be 4 bytes")
+		return raw_name
+
+	@staticmethod
+	def _name_from_wire(name):
+		if isinstance(name, bytes):
+			return name.decode("ascii")
+		return name
 	
 	
 	def __init__(self, name=None, value=None):
 		# handle "null" property packed name and value first
-		if name == "\x00\x00\x00\x00" and value == "\x00\x00\x00\x00":
+		if name in ["\x00\x00\x00\x00", self._null_raw_value] and value == self._null_raw_value:
 			name = None
 			value = None
+		else:
+			name = self._name_from_wire(name)
 		
 		if name and name not in self.get_supported_property_names():
 			raise ACPPropertyError("invalid property name passed to initializer: {0}".format(name))
@@ -606,10 +629,10 @@ class ACPProperty(object):
 	def _init_dec(self, value):
 		if   type(value) == int:
 			return value
-		elif type(value) == str:
+		elif type(value) == bytes:
 			try:
 				return struct.unpack("!I", value)[0]
-			except:
+			except struct.error:
 				raise ACPPropertyInitValueError("invalid packed binary string")
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
@@ -617,25 +640,27 @@ class ACPProperty(object):
 	def _init_hex(self, value):
 		if   type(value) == int:
 			return value
-		elif type(value) == str:
+		elif type(value) == bytes:
 			try:
 				return struct.unpack("!I", value)[0]
-			except:
+			except struct.error:
 				raise ACPPropertyInitValueError("invalid packed binary string")
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_mac(self, value):
-		if type(value) == str:
+		if type(value) == bytes:
 			# first, try as packed binary value
 			if len(value) == 6:
 				return value
+			raise ACPPropertyInitValueError("invalid value")
+		elif type(value) == str:
 			# second, attempt to unpack colon delimited value
 			mac_bytes = value.split(":")
 			if len(mac_bytes) == 6:
 				try:
-					return "".join(mac_bytes).decode("hex")
-				except TypeError:
+					return bytes.fromhex("".join(mac_bytes))
+				except ValueError:
 					raise ACPPropertyInitValueError("non-hex digit in value")
 			# fallthrough
 			raise ACPPropertyInitValueError("invalid value")
@@ -643,19 +668,19 @@ class ACPProperty(object):
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_bin(self, value):
-		if type(value) == str:
+		if type(value) == bytes:
 			return value
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_cfb(self, value):
-		if type(value) == str:
+		if type(value) == bytes:
 			return value
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
 	def _init_log(self, value):
-		if type(value) == str:
+		if type(value) == bytes:
 			return value
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
@@ -663,6 +688,8 @@ class ACPProperty(object):
 	def _init_str(self, value):
 		if type(value) == str:
 			return value
+		elif type(value) == bytes:
+			return value.decode("utf-8")
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
@@ -692,19 +719,19 @@ class ACPProperty(object):
 	def _format_mac(self, value):
 		mac_bytes = []
 		for i in range(6):
-			mac_bytes.append(value[i].encode("hex"))
+			mac_bytes.append("{0:02x}".format(value[i]))
 		return "{0}:{1}:{2}:{3}:{4}:{5}".format(*mac_bytes)
 	
 	def _format_bin(self, value):
-		return value.encode("hex")
+		return value.hex()
 	
 	def _format_cfb(self, value):
 		return pprint.pformat(CFLBinaryPListParser.parse(value))
 	
 	def _format_log(self, value):
 		s = ""
-		for line in value.strip("\x00").split("\x00"):
-			s += "{0}\n".format(line)
+		for line in value.strip(b"\x00").split(b"\x00"):
+			s += "{0}\n".format(line.decode("utf-8", errors="replace"))
 		return s
 	
 	def _format_str(self, value):
@@ -744,23 +771,27 @@ class ACPProperty(object):
 	@classmethod
 	def parse_raw_element_header(cls, data):
 		try:
-			return cls._element_header_format.unpack(data)
+			name, flags, size = cls._element_header_format.unpack(data)
 		except struct.error:
 			raise ACPPropertyError("failed to parse property element header")
+		return cls._name_from_wire(name), flags, size
 	
 	
 	@classmethod
 	def compose_raw_element(cls, flags, property):
 		#TODO: handle flags!???
 		#XXX: handles "null" name or value first, but this is currently garbage
-		name = property.name if property.name is not None else "\x00\x00\x00\x00"
-		value = property.value if property.value is not None else "\x00\x00\x00\x00"
+		name = cls._name_to_wire(property.name)
+		value = property.value if property.value is not None else cls._null_raw_value
 		if   type(value) == int:
 			st = struct.Struct(">I")
 			#XXX: this could throw an exception, we need to range check int/hex values to ensure they pack into 32 bits still
 			return cls.compose_raw_element_header(name, flags, st.size) + st.pack(value)
-		elif type(value) == str:
+		elif type(value) == bytes:
 			return cls.compose_raw_element_header(name, flags, len(value)) + value
+		elif type(value) == str:
+			raw_value = value.encode("utf-8")
+			return cls.compose_raw_element_header(name, flags, len(raw_value)) + raw_value
 		else:
 			raise ACPPropertyError("unhandled property type for raw element composition")
 	
@@ -768,6 +799,6 @@ class ACPProperty(object):
 	@classmethod
 	def compose_raw_element_header(cls, name, flags, size):
 		try:
-			return cls._element_header_format.pack(name, flags, size)
+			return cls._element_header_format.pack(cls._name_to_wire(name), flags, size)
 		except struct.error:
 			raise ACPPropertyError("failed to compose property header")

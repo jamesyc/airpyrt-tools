@@ -1,5 +1,6 @@
 import logging
 import socket
+import time
 
 from .encryption import ACPEncryption
 
@@ -58,7 +59,7 @@ class _ACPSession(object):
 			recvd_chunks.append(data)
 			recvd_size += len(data)
 		
-		return "".join(recvd_chunks)
+		return b"".join(recvd_chunks)
 	
 	def _recv_size_timeout(self, size, timeout):
 		#XXX: blargh
@@ -89,15 +90,15 @@ class _ACPSession(object):
 		
 		#XXX: should non-blocking just be the default?
 		self.sock.setblocking(1)
-		return "".join(recvd_chunks)
+		return b"".join(recvd_chunks)
 	
 
 	def recv(self, size, timeout=0):
 		if not self.sock:
 			#XXX: do nothing? throw an exception?
-			return ""
+			return b""
 		
-		data = ""
+		data = b""
 		if timeout:
 			data = self._recv_size_timeout(size, timeout)
 		else:
@@ -113,8 +114,8 @@ class ACPClientSession(_ACPSession):
 	def enable_encryption(self, key, client_iv, server_iv):
 		self.encryption_context = ACPEncryption(key, client_iv, server_iv)
 		
-		self.encrypt_method = encryption_context.client_encrypt
-		self.decrypt_method = encryption_context.server_decrypt
+		self.encrypt_method = self.encryption_context.client_encrypt
+		self.decrypt_method = self.encryption_context.server_decrypt
 
 
 class ACPServerSession(_ACPSession):
@@ -123,5 +124,4 @@ class ACPServerSession(_ACPSession):
 		
 		self.encrypt_method = self.encryption_context.server_encrypt
 		self.decrypt_method = self.encryption_context.client_decrypt
-
 
