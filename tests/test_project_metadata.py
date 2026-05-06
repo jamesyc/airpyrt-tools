@@ -40,11 +40,15 @@ def test_readme_documents_supported_python_and_release_workflow():
     assert "usage: acp [-h] [-t address] [-p password] [-v] [--listprop]" in readme
     assert "--flash-primary firmware_path" in readme
     assert "Basebinary commands:" in readme
+    assert "Test arguments:" in readme
+    assert "--srp-test" in readme
+    assert "List supported property names:" in readme
+    assert "Inspect a supported property:" in readme
+    assert "Work with basebinary firmware files:" in readme
     assert (
         "SRP/protocol v2 authentication and full session encryption are not implemented"
         in readme
     )
-    assert "--srp-test" not in readme
 
 
 def test_ci_exercises_supported_python_versions():

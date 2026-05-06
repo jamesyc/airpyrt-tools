@@ -316,11 +316,12 @@ def build_parser():
         help="extract the gzimg contents",
     )
 
-    parser.add_argument(
+    test_group = parser.add_argument_group("Test arguments")
+    test_group.add_argument(
         "--srp-test",
         action="store_const",
         const=True,
-        help=argparse.SUPPRESS,
+        help="SRP (requires OS X)",
     )
 
     return parser

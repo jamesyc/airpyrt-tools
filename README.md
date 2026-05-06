@@ -1,12 +1,8 @@
 # AirPyrt Tools
 
-AirPyrt Tools is a Python package and `acp` command-line tool for working with
-Apple AirPort ACP properties and basebinary firmware files.
-
-
 ### License
 
-See [LICENSE](LICENSE).
+See LICENSE
 
 
 ### Requirements
@@ -18,11 +14,7 @@ See [LICENSE](LICENSE).
 
 ### Installation
 
-For command-line use from a checkout:
-
 `pipx install .`
-
-To install into the active Python environment:
 
 `python -m pip install .`
 
@@ -50,6 +42,7 @@ python -m pip install -e ".[dev]"
                [--dump-syslog] [--reboot] [--factory-reset]
                [--flash-primary firmware_path] [--do-feat-command]
                [--decrypt inpath outpath] [--extract inpath outpath]
+               [--srp-test]
 
     options:
       -h, --help            show this help message and exit
@@ -81,14 +74,34 @@ python -m pip install -e ".[dev]"
       --extract inpath outpath
                             extract the gzimg contents
 
+    Test arguments:
+      --srp-test            SRP (requires OS X)
+
 
 ### Examples
 
+List supported property names:
+
 ```
 acp --listprop
+```
+
+Inspect a supported property:
+
+```
 acp --helpprop syNm
+```
+
+Read or set a router property:
+
+```
 acp --getprop syNm --target 10.0.1.1 --password "$AIRPORT_PASSWORD"
 acp --setprop syNm "Office Router" --target 10.0.1.1 --password "$AIRPORT_PASSWORD"
+```
+
+Work with basebinary firmware files:
+
+```
 acp --decrypt firmware.bin decrypted.bin
 acp --extract decrypted.bin rootfs.img
 ```
@@ -127,18 +140,18 @@ Until SRP/protocol v2 authentication and full session encryption are implemented
 remote administration with this tool should be treated as unsafe on untrusted
 networks.
 
-This project grew organically out of the original author's understanding of
-various pieces of the ACP protocol. The code has been restructured a few times as
-that understanding improved, but there are still gaps in the implementation and
-some code smell. This fork is keeping that exploratory history intact while
-modernizing the package for current Python 3.
+The original project grew organically out of the author's understanding of various
+pieces of the ACP protocol. It was restructured a few times as that understanding
+improved, but there are still gaps in the implementation and some code smell.
+This fork keeps that exploratory history intact while modernizing the package for
+current Python 3.
 
-Return value of `0xfffffff6` when using `--getprop` means the property is not
-available or readable on that device.
+Return value of 0xfffffff6 when using --getprop means the property is not
+available/readable.
 
 The AppleSRP ctypes path is experimental and depends on Apple's private macOS
-AppleSRP framework. It is kept as hidden, unsupported code for now; portable SRP
-support is still future work.
+AppleSRP framework. It remains available through --srp-test for protocol
+experiments; portable SRP support is still future work.
 
 SRP/protocol v2 authentication and full session encryption are not implemented.
 
@@ -147,10 +160,12 @@ SRP/protocol v2 authentication and full session encryption are not implemented.
 
 - add IP address type for properties, make sure it supports IPv4 and IPv6
 - specify RO/WO/RW attribute for properties
-- finish exception handling for malformed struct fields and protocol replies
-- finish whole-package lint cleanup beyond the currently checked surfaces
+- exception handling:
+  - invalid struct fields aren't handled well in many cases
+  - finish adding custom exception classes and make sure we're using them
+- logging (mostly done, still looks horrible) with verbosity controls
 - review and update docstrings
-- SRP support without the private AppleSRP framework
+- SRP support (fix pysrp because ctypes hax, while fun, are horrible and non-portable)
 - ACP protocol version 2 (full session encryption)
 - handle encrypted property elements
 - basebinary repacking/reencryption
