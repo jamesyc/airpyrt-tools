@@ -1,110 +1,86 @@
 # AirPyrt Tools
 
-### License
+AirPyrt Tools is a Python package and `acp` command-line tool for working with
+Apple AirPort ACP properties and basebinary firmware files.
 
-See LICENSE
-
-
-### Requirements
-
-- Modernization in progress; target runtime is Python 3.11+
-- pycryptodomex
+The project has been ported from Python 2 to modern Python 3. The current test
+suite covers the core protocol bytes/text boundaries, message headers, property
+packing, CFL binary plist parsing/composition, basebinary parsing, encryption
+vectors, sessions, and the CLI dispatcher.
 
 
-### Installation
+## Requirements
 
-During modernization, install from the project root:
+- Python 3.11 or newer
+- Tested on Python 3.11 through 3.14
+- `pycryptodomex`
 
-`python -m pip install .`
+
+## Installation
+
+From a checkout, install the CLI into an isolated environment with `pipx`:
+
+```bash
+pipx install .
+```
+
+You can also install into the active Python environment:
+
+```bash
+python -m pip install .
+```
 
 For local development:
 
-```
+```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -e ".[dev]"
+```
+
+
+## Development
+
+Useful verification commands:
+
+```bash
+python -m pytest
 python -m coverage run -m pytest
 python -m coverage report
+python -m ruff check acp/cli.py setup.py tests
+python -m compileall -q acp
 python -m build
 python -m twine check dist/*
+python -m pip install --force-reinstall dist/*.whl
+python -m pip check
 ```
 
-The project is being modernized for Python 3. The test suite now covers the core
-bytes/text boundaries used by the protocol, firmware, and CLI helpers.
+The current ruff target covers the package entrypoint, packaging shim, and tests.
+The older protocol modules still need a separate whole-package lint cleanup pass.
 
 
-### Usage
+## Usage
 
-`python [-B] -m acp`
+The installed console script is `acp`:
 
-    usage: acp [-h] [-t address] [-p password] [-v] [--listprop]
-                       [--helpprop property] [--getprop property]
-                       [--setprop property value] [--dumpprop] [--acpprop]
-                       [--dump-syslog] [--reboot] [--factory-reset]
-                       [--flash-primary firmware_path] [--do-feat-command]
-                       [--decrypt inpath outpath] [--extract inpath outpath]
-                       [--srp-test]
-
-    optional arguments:
-      -h, --help            show this help message and exit
-
-    AirPort client parameters:
-      -t address, --target address
-                            IP address or hostname of the target router
-      -p password, --password password
-                            router admin password
-      -v, --verbose         enable debug logging
-
-    AirPort client commands:
-      --listprop            list supported properties
-      --helpprop property   print the description of the specified property
-      --getprop property    get the value of the specified property
-      --setprop property value
-                            set the value of the specified property
-      --dumpprop            dump values of all supported properties
-      --acpprop             get acp acpprop list
-      --dump-syslog         dump the router system log
-      --reboot              reboot device
-      --factory-reset       RESET EVERYTHING and reboot; you have been warned!
-      --flash-primary firmware_path
-                            flash primary partition firmware
-      --do-feat-command     send 0x1b (feat) command
-
-    Basebinary commands:
-      --decrypt inpath outpath
-                            decrypt the basebinary
-      --extract inpath outpath
-                            extract the gzimg contents
-
-    Test arguments:
-      --srp-test            SRP (requires OS X)
-
-
-### Examples
-
-List supported property names:
-
+```bash
+acp --help
 ```
+
+The module entrypoint is equivalent:
+
+```bash
+python -m acp --help
+```
+
+Common examples:
+
+```bash
 acp --listprop
-```
-
-Inspect a supported property:
-
-```
 acp --helpprop syNm
-```
-
-Read or set a router property:
-
-```
 acp --getprop syNm --target 10.0.1.1 --password "$AIRPORT_PASSWORD"
 acp --setprop syNm "Office Router" --target 10.0.1.1 --password "$AIRPORT_PASSWORD"
-```
-
-Work with basebinary firmware files:
-
-```
 acp --decrypt firmware.bin decrypted.bin
 acp --extract decrypted.bin rootfs.img
 ```
@@ -114,47 +90,29 @@ router replies, sockets, or input files fail validation. Add `--verbose` to enab
 debug logging while investigating failures.
 
 
-### Notes
+## Security
 
-**IMPORTANT**
+Remote router commands currently use the old ACP authentication scheme. That
+scheme puts the admin password on the wire in a trivially recoverable form. Treat
+remote administration with this tool as unsafe on untrusted networks, and avoid
+using it across any network path you do not control.
 
-This still uses the old ACP protocol implementation, which puts the admin password
-of the device over the wire in a trivially recoverable format. This was fixed by 
-in the new protocol which uses SRP authentication and better encryption of requests
-to/from the device. Until this is implemented this tool is entirely unsafe to use,
-especially for remote administration (which you should have disabled anyway...).
-
-This project grew organically out of my understanding of various pieces of the ACP 
-protocol. I've restructured the code a few times as it has improved, but there are 
-still many gaps in the implementation, and a lot of code smell. Between sitting on
-this indefinitely making incremental improvements (and probably never releasing a 
-"finished" product) and releasing it in a rougher state for others to explore, the
-latter made far more sense.
-
-Return value of 0xfffffff6 when using --getprop means the property is not avaliable/readable
-
-The AppleSRP ctypes path is experimental and depends on Apple's private macOS
-AppleSRP framework. It is reported as unavailable on systems where that framework
-cannot be imported; portable SRP support is still future work.
+SRP/protocol v2 authentication and full session encryption are not implemented.
+The old AppleSRP ctypes experiment depends on Apple's private macOS AppleSRP
+framework and is not a supported user feature.
 
 
-## TODO (very incomplete list in no particular order)
+## Known Limitations
 
-- add IP address type for properties, make sure it supports IPv4 and IPv6
-- specify RO/WO/RW attribute for properties
-- exception handling:
-  - invalid struct fields aren't handled well in many cases
-  - finish adding custom exception classes and make sure we're using them
-- logging (mostly done, still looks horrible) with verbosity controls
-- review and update docstrings
-- SRP support (fix pysrp because ctypes hax, while fun, are horrible and non-portable)
-- ACP protocol version 2 (full session encryption)
-- handle encrypted property elements
-- basebinary repacking/reencryption
-- basebinary rootfs mounting
-- threaded server
-- handle protocol v1 (for old firmwares/devices)
-- bonjour announcement/discovery
-- options to specify no encryption, old method, and new (SRP) method
-- ACPMonitorSession support
-- ACPRPC support
+- ACP protocol v2 and portable SRP authentication are not supported.
+- Encrypted property elements are not supported.
+- Basebinary repacking and reencryption are not supported.
+- Bonjour discovery is not implemented.
+- Some property metadata is incomplete or inferred from old protocol research.
+- Return value `0xfffffff6` from `--getprop` means the property is not available
+  or is not readable on that device.
+
+
+## License
+
+See [LICENSE](LICENSE).

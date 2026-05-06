@@ -138,6 +138,16 @@ def test_run_parser_errors_return_argparse_status_code():
     assert "expected 1 argument" in stderr.getvalue()
 
 
+def test_run_help_hides_experimental_srp_command():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(["--help"], stdout=stdout, stderr=stderr)
+
+    assert status == 0
+    assert "--srp-test" not in stdout.getvalue()
+
+
 def test_run_reconfigures_logging_for_each_stderr_stream(monkeypatch):
     def handler(unused):
         logging.warning("handler warning")
