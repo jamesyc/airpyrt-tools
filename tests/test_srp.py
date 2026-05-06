@@ -19,6 +19,22 @@ def _mgf1_sha1(seed, length):
     return bytes(output[:length])
 
 
+def _sha1_int(*parts):
+    digest = hashlib.sha1()
+    for part in parts:
+        digest.update(part)
+    return int.from_bytes(digest.digest(), "big")
+
+
+def _zero_base_server_public_key(username, password, modulus, generator, salt):
+    n = int.from_bytes(modulus, "big")
+    g = int.from_bytes(generator, "big")
+    password_hash = hashlib.sha1(username + b":" + password).digest()
+    x = _sha1_int(salt, password_hash)
+    k = _sha1_int(modulus, generator)
+    return (k * pow(g, x, n)) % n
+
+
 RFC5054_1024_N = """
     EEAF0AB9 ADB38DD6 9C33F80A FA8FC5E8 60726187 75FF3C0B 9EA2314C
     9C256576 D674DF74 96EA81D3 383B4813 D692C6E0 E0D5D8E2 50B98BE4
@@ -182,6 +198,36 @@ def test_srp6a_rejects_zero_modulo_server_public_key():
             _unhex(RFC5054_SALT),
             _unhex(RFC5054_1024_N),
         )
+
+
+def test_srp6a_rejects_zero_premaster_base():
+    modulus = b"\x17"
+    generator = b"\x02"
+    salt = b"salt"
+    server_public_key_int = _zero_base_server_public_key(
+        b"alice",
+        b"password123",
+        modulus,
+        generator,
+        salt,
+    )
+    assert server_public_key_int != 0
+    client = SRP6aClient("alice", "password123", private_key=1)
+
+    with pytest.raises(ACPClientError, match="premaster base"):
+        client.process_challenge(
+            modulus,
+            generator,
+            salt,
+            bytes([server_public_key_int]),
+        )
+
+
+def test_srp6a_rejects_generator_not_less_than_modulus():
+    client = SRP6aClient("alice", "password123", private_key=1)
+
+    with pytest.raises(ACPClientError, match="generator"):
+        client.process_challenge(b"\x17", b"\x17", b"salt", b"\x01")
 
 
 def test_srp6a_rejects_non_positive_private_key():

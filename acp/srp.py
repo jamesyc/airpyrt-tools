@@ -137,8 +137,8 @@ class SRP6aClient:
 
         if n <= 0:
             raise ACPClientError("SRP modulus must be positive")
-        if g <= 1:
-            raise ACPClientError("SRP generator must be greater than one")
+        if g <= 1 or g >= n:
+            raise ACPClientError("SRP generator must be greater than one and less than N")
         if server_public_key_int == 0 or server_public_key_int >= n:
             raise ACPClientError("SRP server public key must not be zero modulo N")
 
@@ -160,6 +160,8 @@ class SRP6aClient:
 
         verifier_component = pow(g, x, n)
         base = (server_public_key_int - multiplier * verifier_component) % n
+        if base == 0:
+            raise ACPClientError("SRP premaster base must not be zero modulo N")
         exponent = private_key + scrambling_parameter * x
         premaster_secret_int = pow(base, exponent, n)
         premaster_secret = _pad_int(premaster_secret_int, modulus_size)
