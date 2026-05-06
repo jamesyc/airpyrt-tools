@@ -654,7 +654,7 @@ class ACPProperty(object):
 			try:
 				value = _init_handler(value)
 			except ACPPropertyInitValueError as e:
-				raise ACPPropertyError("{0!s} provided for \"{1}\" property type: {2!r}".format(e, prop_type, value))
+				raise ACPPropertyError("{0!s} provided for \"{1}\" property type: {2!r}".format(e, prop_type, value)) from e
 			logging.debug("new value: {0!r} type: {1}".format(value, type(value)))
 			
 			validator = self.get_property_validator(name)
@@ -670,8 +670,8 @@ class ACPProperty(object):
 		elif isinstance(value, bytes):
 			try:
 				return struct.unpack("!I", value)[0]
-			except struct.error:
-				raise ACPPropertyInitValueError("invalid packed binary string")
+			except struct.error as e:
+				raise ACPPropertyInitValueError("invalid packed binary string") from e
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
@@ -681,8 +681,8 @@ class ACPProperty(object):
 		elif isinstance(value, bytes):
 			try:
 				return struct.unpack("!I", value)[0]
-			except struct.error:
-				raise ACPPropertyInitValueError("invalid packed binary string")
+			except struct.error as e:
+				raise ACPPropertyInitValueError("invalid packed binary string") from e
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
@@ -698,8 +698,8 @@ class ACPProperty(object):
 			if len(mac_bytes) == 6:
 				try:
 					return bytes.fromhex("".join(mac_bytes))
-				except ValueError:
-					raise ACPPropertyInitValueError("non-hex digit in value")
+				except ValueError as e:
+					raise ACPPropertyInitValueError("non-hex digit in value") from e
 			# fallthrough
 			raise ACPPropertyInitValueError("invalid value")
 		else:
@@ -729,8 +729,8 @@ class ACPProperty(object):
 		elif isinstance(value, bytes):
 			try:
 				return value.decode("utf-8")
-			except UnicodeDecodeError:
-				raise ACPPropertyInitValueError("invalid UTF-8 string")
+			except UnicodeDecodeError as e:
+				raise ACPPropertyInitValueError("invalid UTF-8 string") from e
 		else:
 			raise ACPPropertyInitValueError("invalid built-in type")
 	
@@ -823,8 +823,8 @@ class ACPProperty(object):
 	def parse_raw_element_header(cls, data):
 		try:
 			name, flags, size = cls._element_header_format.unpack(data)
-		except struct.error:
-			raise ACPPropertyError("failed to parse property element header")
+		except struct.error as e:
+			raise ACPPropertyError("failed to parse property element header") from e
 		return cls._name_from_wire(name), flags, size
 	
 	
@@ -852,5 +852,5 @@ class ACPProperty(object):
 	def compose_raw_element_header(cls, name, flags, size):
 		try:
 			return cls._element_header_format.pack(cls._name_to_wire(name), flags, size)
-		except struct.error:
-			raise ACPPropertyError("failed to compose property header")
+		except struct.error as e:
+			raise ACPPropertyError("failed to compose property header") from e

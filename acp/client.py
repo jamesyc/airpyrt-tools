@@ -55,13 +55,13 @@ class ACPClient(object):
 	def _unpack_property_error(self, operation, name, prop_data):
 		try:
 			(error_code, ) = struct.unpack(">I", prop_data)
-		except struct.error:
+		except struct.error as e:
 			raise ACPClientError(
 				"{0} returned a malformed property error for \"{1}\"".format(
 					operation,
 					name,
 				)
-			)
+			) from e
 		raise ACPClientError(
 			"error {0} for property \"{1}\": {2:#x}".format(
 				operation,

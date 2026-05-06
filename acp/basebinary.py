@@ -88,8 +88,8 @@ class Basebinary(object):
 	def parse_header(cls, data):
 		try:
 			magic, byte_0x0F, model, version, byte_0x18, byte_0x19, byte_0x1A, flags, unk_0x1C = cls._header_format.unpack(data)
-		except struct.error:
-			raise BasebinaryError("failed to parse firmware header")
+		except struct.error as e:
+			raise BasebinaryError("failed to parse firmware header") from e
 		
 		if magic != cls._header_magic:
 			raise BasebinaryError("bad header magic")
@@ -156,11 +156,11 @@ class Basebinary(object):
 		#TODO: proper gzip header validation?
 		try:
 			gzip_offset = data.index(b"\x1f\x8b\x08")
-		except ValueError:
-			raise BasebinaryError("gzip payload not found")
+		except ValueError as e:
+			raise BasebinaryError("gzip payload not found") from e
 		gzdata = data[gzip_offset:]
 		
 		try:
 			return zlib.decompress(gzdata, 16+zlib.MAX_WBITS)
-		except zlib.error:
-			raise BasebinaryError("failed to decompress gzip payload")
+		except zlib.error as e:
+			raise BasebinaryError("failed to decompress gzip payload") from e
