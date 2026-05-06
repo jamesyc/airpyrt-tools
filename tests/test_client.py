@@ -1,9 +1,11 @@
 import logging
 import struct
 import sys
+from collections import OrderedDict
 
 import pytest
 
+from acp.cflbinary import CFLBinaryPListComposer, CFLBinaryPListParser
 from acp.client import ACPClient
 from acp.exception import ACPClientError, ACPSessionError
 from acp.message import ACPMessage
@@ -17,15 +19,31 @@ class FakeACPServer:
         get_props=None,
         get_prop_errors=None,
         error_code=0,
+        auth_challenge=None,
+        auth_response=b"server-proof",
+        auth_iv=b"server-iv-123456",
+        auth_error_code=0,
         max_chunk=None,
         truncate_reply_to=None,
     ):
         self.get_props = get_props or []
         self.get_prop_errors = get_prop_errors or []
         self.error_code = error_code
+        self.auth_challenge = auth_challenge or OrderedDict(
+            [
+                ("modulus", b"\x0b"),
+                ("generator", b"\x02"),
+                ("salt", b"salt"),
+                ("publicKey", b"\x08"),
+            ]
+        )
+        self.auth_response = auth_response
+        self.auth_iv = auth_iv
+        self.auth_error_code = auth_error_code
         self.max_chunk = max_chunk
         self.truncate_reply_to = truncate_reply_to
         self.requests = []
+        self.auth_requests = []
 
     def handle_request(self, data):
         request = ACPMessage.parse_raw(data)
@@ -43,6 +61,30 @@ class FakeACPServer:
             reply = stream_header(0x15, self.error_code)
             if self.error_code == 0:
                 reply += ACPProperty.compose_raw_element(0, ACPProperty())
+        elif request.command == 0x1A:
+            auth_request = CFLBinaryPListParser.parse(request.body)
+            self.auth_requests.append(auth_request)
+            if auth_request["state"] == 1:
+                reply = message_packet(
+                    0x1A,
+                    CFLBinaryPListComposer.compose(self.auth_challenge),
+                    self.auth_error_code,
+                )
+            elif auth_request["state"] == 3:
+                reply = message_packet(
+                    0x1A,
+                    CFLBinaryPListComposer.compose(
+                        OrderedDict(
+                            [
+                                ("response", self.auth_response),
+                                ("iv", self.auth_iv),
+                            ]
+                        )
+                    ),
+                    self.auth_error_code,
+                )
+            else:
+                raise AssertionError(f"unexpected auth state: {auth_request['state']!r}")
         else:
             raise AssertionError(f"unexpected command: {request.command:#x}")
         if self.truncate_reply_to is not None:
@@ -85,10 +127,42 @@ def stream_header(command, error_code=0):
     )._compose_header()
 
 
+def message_packet(command, payload, error_code=0):
+    return ACPMessage(
+        0x00030001,
+        0,
+        0,
+        command,
+        error_code,
+        b"\x00" * 32,
+        payload,
+    )._compose_raw_packet()
+
+
 def client_with_fake_server(server):
     client = ACPClient("target", "password")
     client.session.sock = FakeACPServerSocket(server)
     return client
+
+
+class FakeSRPClient:
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+        self.challenge = None
+        self.server_proof = None
+        self.closed = False
+
+    def process_challenge(self, modulus, generator, salt, server_public_key):
+        self.challenge = (modulus, generator, salt, server_public_key)
+        return b"client-public", b"client-proof", b"session-key"
+
+    def verify_server_proof(self, server_proof):
+        self.server_proof = server_proof
+        return True
+
+    def close(self):
+        self.closed = True
 
 
 def test_get_properties_uses_fake_server_and_parses_chunked_property_reply():
@@ -143,6 +217,62 @@ def test_get_properties_raises_session_error_for_short_server_reply():
 
     with pytest.raises(ACPSessionError, match="connection closed"):
         client.get_properties(["syNm"])
+
+
+def test_authenticate_srp_exchanges_auth_plists(monkeypatch):
+    monkeypatch.setattr("acp.client.os.urandom", lambda size: b"client-iv-123456")
+    instances = []
+
+    def srp_client_factory(username, password):
+        instance = FakeSRPClient(username, password)
+        instances.append(instance)
+        return instance
+
+    server = FakeACPServer()
+    client = client_with_fake_server(server)
+
+    session_key, client_iv, server_iv = client.authenticate_srp(
+        username="admin",
+        srp_client_factory=srp_client_factory,
+    )
+
+    assert session_key == b"session-key"
+    assert client_iv == b"client-iv-123456"
+    assert server_iv == b"server-iv-123456"
+    assert len(server.auth_requests) == 2
+    assert server.auth_requests[0] == {"state": 1, "username": "admin"}
+    assert server.auth_requests[1] == {
+        "iv": b"client-iv-123456",
+        "publicKey": b"client-public",
+        "state": 3,
+        "response": b"client-proof",
+    }
+    assert instances[0].username == "admin"
+    assert instances[0].password == "password"
+    assert instances[0].challenge == (
+        b"\x0b",
+        b"\x02",
+        b"salt",
+        b"\x08",
+    )
+    assert instances[0].server_proof == b"server-proof"
+    assert instances[0].closed is True
+
+
+def test_authenticate_srp_reports_missing_challenge_field():
+    server = FakeACPServer(auth_challenge={"modulus": b"\x0b"})
+    client = client_with_fake_server(server)
+
+    with pytest.raises(ACPClientError, match='missing required field "generator"'):
+        client.authenticate_srp(srp_client_factory=FakeSRPClient)
+
+
+def test_authenticate_srp_reports_reply_error_code():
+    server = FakeACPServer(auth_error_code=0x1234)
+    client = client_with_fake_server(server)
+
+    with pytest.raises(ACPClientError, match="authenticate_srp failed"):
+        client.authenticate_srp(srp_client_factory=FakeSRPClient)
 
 
 def test_importing_client_does_not_load_applesrp_framework(monkeypatch):
