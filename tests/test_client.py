@@ -177,6 +177,14 @@ class PassthroughEncryption:
         return data
 
 
+class PrefixEncryption(PassthroughEncryption):
+    def client_encrypt(self, data):
+        return b"encrypted:" + data
+
+    def server_decrypt(self, data):
+        return data.removeprefix(b"encrypted:")
+
+
 def test_get_properties_uses_fake_server_and_parses_chunked_property_reply():
     server = FakeACPServer(get_props=[ACPProperty("syNm", "router")], max_chunk=3)
     client = client_with_fake_server(server)
@@ -287,6 +295,25 @@ def test_authenticate_srp_enables_encrypted_session_for_followup_reads(monkeypat
     assert client.session.encryption_context.client_iv == b"client-iv-123456"
     assert client.session.encryption_context.server_iv == b"server-iv-123456"
     assert [request.command for request in server.requests] == [0x1A, 0x1A, 0x14]
+
+
+def test_close_clears_srp_encryption_before_reusing_client(monkeypatch):
+    monkeypatch.setattr("acp.client.os.urandom", lambda size: b"client-iv-123456")
+    monkeypatch.setattr("acp.session.ACPEncryption", PrefixEncryption)
+    first_server = FakeACPServer()
+    second_server = FakeACPServer()
+    client = client_with_fake_server(first_server)
+
+    client.authenticate_srp(srp_client_factory=FakeSRPClient)
+    client.close()
+    client.session.sock = FakeACPServerSocket(second_server)
+    client.authenticate_srp(srp_client_factory=FakeSRPClient)
+
+    first_auth = first_server.requests[0]
+    second_auth = second_server.requests[0]
+    assert first_auth.command == 0x1A
+    assert second_auth.command == 0x1A
+    assert not client.session.sock.sent[0].startswith(b"encrypted:")
 
 
 def test_authenticate_srp_reports_missing_challenge_field():
