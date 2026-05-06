@@ -1,9 +1,8 @@
 import logging
-import os.path
 import struct
 import zlib
 
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 
 #XXX: ugh...
 from .misc import cast_u32
@@ -87,7 +86,10 @@ class Basebinary(object):
 	
 	@classmethod
 	def parse_header(cls, data):
-		magic, byte_0x0F, model, version, byte_0x18, byte_0x19, byte_0x1A, flags, unk_0x1C = cls._header_format.unpack(data)
+		try:
+			magic, byte_0x0F, model, version, byte_0x18, byte_0x19, byte_0x1A, flags, unk_0x1C = cls._header_format.unpack(data)
+		except struct.error:
+			raise BasebinaryError("failed to parse firmware header")
 		
 		if magic != cls._header_magic:
 			raise BasebinaryError("bad header magic")
@@ -152,7 +154,13 @@ class Basebinary(object):
 	@classmethod
 	def extract(cls, data):
 		#TODO: proper gzip header validation?
-		gzip_offset = data.index(b"\x1f\x8b\x08")
+		try:
+			gzip_offset = data.index(b"\x1f\x8b\x08")
+		except ValueError:
+			raise BasebinaryError("gzip payload not found")
 		gzdata = data[gzip_offset:]
 		
-		return zlib.decompress(gzdata, 16+zlib.MAX_WBITS)
+		try:
+			return zlib.decompress(gzdata, 16+zlib.MAX_WBITS)
+		except zlib.error:
+			raise BasebinaryError("failed to decompress gzip payload")

@@ -14,7 +14,7 @@ authors = [
     { name = "Vince Cali", email = "0x56.0x69.0x6e.0x63.0x65@gmail.com" },
 ]
 dependencies = [
-    "pycryptodome>=3.20",
+    "pycryptodomex>=3.20",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -34,6 +34,7 @@ dev = [
     "coverage[toml]>=7.6",
     "pytest>=8.3",
     "ruff>=0.8",
+    "twine>=5.1",
 ]
 
 [project.scripts]

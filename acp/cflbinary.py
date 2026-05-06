@@ -282,6 +282,8 @@ class CFLBinaryPListParser(object):
 		
 		elif object_type == 0x40:     # data
 			size, data = cls._unpack_count(object_info, data)
+			if len(data) < size:
+				raise CFLBinaryPListParseError("failed to unpack data value")
 			#XXX: we return data as str type, is this ok?
 			return _lslice(data, size)
 		
@@ -363,12 +365,13 @@ class CFLBinaryPListParser(object):
 		if header_data != _header_magic:
 			raise CFLBinaryPListParseError("bad header magic")
 		
-		# read object stream (assume one root object)
-		obj, remaining_data = cls._unpack_object(data)
-		if len(remaining_data) > _footer_size:
-			raise CFLBinaryPListParseError("extra data found after unpacking root object")
-		
-		if remaining_data != _footer_magic:
+		object_data, footer_data = _lslice(data, len(data) - _footer_size)
+		if footer_data != _footer_magic:
 			raise CFLBinaryPListParseError("bad footer magic")
+
+		# read object stream (assume one root object)
+		obj, remaining_data = cls._unpack_object(object_data)
+		if remaining_data:
+			raise CFLBinaryPListParseError("extra data found after unpacking root object")
 		
 		return obj

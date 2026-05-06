@@ -15,6 +15,8 @@ def test_project_metadata_defines_package_and_cli_entrypoint():
     assert pyproject["project"]["name"] == "acp"
     assert pyproject["project"]["requires-python"] == ">=3.11"
     assert pyproject["project"]["scripts"]["acp"] == "acp.cli:main"
+    assert "pycryptodomex>=3.20" in pyproject["project"]["dependencies"]
+    assert "twine>=5.1" in pyproject["project"]["optional-dependencies"]["dev"]
 
 
 def test_setuptools_package_discovery_includes_subpackages():

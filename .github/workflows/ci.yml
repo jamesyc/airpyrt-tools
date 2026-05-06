@@ -24,8 +24,10 @@ jobs:
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
 
-      - name: Run metadata tests
-        run: python -m pytest
+      - name: Run tests with coverage
+        run: |
+          python -m coverage run -m pytest
+          python -m coverage report
 
       - name: Compile package source
         run: python -m compileall -q acp
@@ -35,6 +37,9 @@ jobs:
 
       - name: Build distributions
         run: python -m build
+
+      - name: Check distribution metadata
+        run: python -m twine check dist/*
 
       - name: Install wheel
         run: python -m pip install --force-reinstall dist/*.whl

@@ -1,4 +1,7 @@
+import pytest
+
 from acp import session
+from acp.exception import ACPSessionError
 from acp.session import ACPClientSession, _ACPSession
 
 
@@ -42,6 +45,29 @@ def test_recv_size_joins_socket_chunks_as_bytes():
     acp_session.sock = FakeSocket(b"abcdef")
 
     assert acp_session.recv(4) == b"abcd"
+
+
+def test_recv_raises_when_socket_closes_before_requested_size():
+    acp_session = _ACPSession("target", "password")
+    acp_session.sock = FakeSocket(b"abc")
+
+    with pytest.raises(ACPSessionError, match="connection closed"):
+        acp_session.recv(4)
+
+
+def test_recv_timeout_restores_blocking_mode(monkeypatch):
+    class BlockingSocket(FakeSocket):
+        def recv(self, size):
+            raise BlockingIOError
+
+    monkeypatch.setattr(session.time, "sleep", lambda _seconds: None)
+    acp_session = _ACPSession("target", "password")
+    acp_session.sock = BlockingSocket()
+
+    with pytest.raises(ACPSessionError, match="timed out"):
+        acp_session.recv(1, timeout=0.001)
+
+    assert acp_session.sock.blocking == [0, 1]
 
 
 def test_recv_without_socket_returns_empty_bytes():

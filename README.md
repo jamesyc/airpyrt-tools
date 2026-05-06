@@ -8,7 +8,7 @@ See LICENSE
 ### Requirements
 
 - Modernization in progress; target runtime is Python 3.11+
-- pycryptodome
+- pycryptodomex
 
 
 ### Installation
@@ -24,8 +24,10 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -e ".[dev]"
-python -m pytest
+python -m coverage run -m pytest
+python -m coverage report
 python -m build
+python -m twine check dist/*
 ```
 
 The project is being modernized for Python 3. The test suite now covers the core
@@ -96,6 +98,10 @@ this indefinitely making incremental improvements (and probably never releasing 
 latter made far more sense.
 
 Return value of 0xfffffff6 when using --getprop means the property is not avaliable/readable
+
+The AppleSRP ctypes path is experimental and depends on Apple's private macOS
+AppleSRP framework. It is reported as unavailable on systems where that framework
+cannot be imported; portable SRP support is still future work.
 
 
 ## TODO (very incomplete list in no particular order)

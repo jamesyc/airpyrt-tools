@@ -3,6 +3,7 @@ import socket
 import time
 
 from .encryption import ACPEncryption
+from .exception import ACPSessionError
 
 
 ACP_SERVER_PORT = 5009
@@ -55,7 +56,9 @@ class _ACPSession(object):
 			#XXX: this is broken for server receiving stream headers
 			data = self.sock.recv(size - recvd_size)
 			if not data:
-				break
+				raise ACPSessionError(
+					"connection closed before receiving {0} bytes".format(size)
+				)
 			recvd_chunks.append(data)
 			recvd_size += len(data)
 		
@@ -67,29 +70,32 @@ class _ACPSession(object):
 		recvd_chunks = []
 		recvd_size = 0
 		
-		begin=time.time()
-		while True:
-			if recvd_size == size:
-				break
-			if recvd_chunks and time.time()-begin > timeout:
-				break
-			if time.time()-begin > timeout*2:
-				break
-			
-			try:
-				#XXX: this is broken for server receiving stream headers
-				data = self.sock.recv(size - recvd_size)
-				if data:
-					recvd_chunks.append(data)
-					recvd_size += len(data)
-					begin = time.time()
-				else:
-					time.sleep(0.1)
-			except socket.error:
-				pass
-		
-		#XXX: should non-blocking just be the default?
-		self.sock.setblocking(1)
+		deadline = time.time() + timeout
+		try:
+			while True:
+				if recvd_size == size:
+					break
+				if time.time() >= deadline:
+					raise ACPSessionError(
+						"timed out before receiving {0} bytes".format(size)
+					)
+
+				try:
+					#XXX: this is broken for server receiving stream headers
+					data = self.sock.recv(size - recvd_size)
+				except OSError:
+					time.sleep(min(0.01, timeout))
+					continue
+
+				if not data:
+					raise ACPSessionError(
+						"connection closed before receiving {0} bytes".format(size)
+					)
+				recvd_chunks.append(data)
+				recvd_size += len(data)
+		finally:
+			#XXX: should non-blocking just be the default?
+			self.sock.setblocking(1)
 		return b"".join(recvd_chunks)
 	
 
@@ -124,4 +130,3 @@ class ACPServerSession(_ACPSession):
 		
 		self.encrypt_method = self.encryption_context.server_encrypt
 		self.decrypt_method = self.encryption_context.client_decrypt
-
