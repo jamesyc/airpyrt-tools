@@ -1,6 +1,6 @@
-import builtins
 import logging
 import struct
+import sys
 
 import pytest
 
@@ -145,15 +145,28 @@ def test_get_properties_raises_session_error_for_short_server_reply():
         client.get_properties(["syNm"])
 
 
+def test_importing_client_does_not_load_applesrp_framework(monkeypatch):
+    import acp.client as client_module
+
+    monkeypatch.delitem(sys.modules, "acp.clibs.AppleSRP", raising=False)
+    monkeypatch.delitem(sys.modules, "acp.clibs", raising=False)
+
+    __import__("importlib").reload(client_module)
+
+    assert "acp.clibs.AppleSRP" not in sys.modules
+
+
 def test_authenticate_applesrp_reports_unavailable_framework(monkeypatch):
-    real_import = builtins.__import__
+    import acp.srp as srp_module
 
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name.endswith("clibs") and "AppleSRP" in fromlist:
+    real_import_module = srp_module.importlib.import_module
+
+    def fake_import_module(name):
+        if name == "acp.clibs.AppleSRP":
             raise OSError("AppleSRP framework missing")
-        return real_import(name, globals, locals, fromlist, level)
+        return real_import_module(name)
 
-    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.setattr(srp_module.importlib, "import_module", fake_import_module)
 
-    with pytest.raises(ACPClientError, match="AppleSRP authentication is unavailable"):
+    with pytest.raises(ACPClientError, match="private macOS AppleSRP framework"):
         ACPClient("target", "password").authenticate_AppleSRP()

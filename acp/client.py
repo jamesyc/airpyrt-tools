@@ -1,13 +1,14 @@
 import logging
 import os
 import struct
-import time
+from collections import OrderedDict
 
 from .cflbinary import CFLBinaryPListComposer, CFLBinaryPListParser
 from .exception import ACPClientError
 from .message import ACPMessage
 from .property import ACPProperty
 from .session import ACPClientSession
+from .srp import AppleSRPClient
 
 
 class ACPClient(object):
@@ -174,19 +175,8 @@ class ACPClient(object):
 		return self.recv(reply_header.body_size)
 	
 	
-	def authenticate_AppleSRP(self):
-		#XXX: STILL TESTING SHIT
-		from collections import OrderedDict		
-		try:
-			import ctypes
-			from .clibs import AppleSRP
-		except (ImportError, OSError, AttributeError) as e:
-			raise ACPClientError(
-				"AppleSRP authentication is unavailable on this system"
-			) from e
-		
+	def _authenticate_srp_client(self, srp_client):
 		username = "admin"
-		username_bytes = username.encode("utf-8")
 		
 		dic = OrderedDict([(u"state", 1), (u"username", username)])
 		payload = CFLBinaryPListComposer.compose(dic)
@@ -209,56 +199,18 @@ class ACPClient(object):
 		salt = params1[u"salt"]
 		server_pkey = params1[u"publicKey"]
 		
-		nhex = n.hex()
-		ghex = g.hex()
-		
-		logging.debug("nhex: {0}".format(nhex))
-		logging.debug("ghex: {0}".format(ghex))
+		logging.debug("nhex: {0}".format(n.hex()))
+		logging.debug("ghex: {0}".format(g.hex()))
 		logging.debug("salt: {0}".format(salt.hex()))
 		logging.debug("server_pkey: {0}".format(server_pkey.hex()))
 		
-		# create SRP context
-		asrp = AppleSRP.SRP_new(AppleSRP.SRP6a_client_method())
-		#logging.debug(asrp.contents)
-		
-		# set username
-		logging.debug("SRP_set_username: {0}".format(AppleSRP.SRP_set_username(asrp, username_bytes)))
-		#logging.debug(asrp.contents)
-		
-		# set parameters from server
-		logging.debug("SRP_set_params: {0}".format(AppleSRP.SRP_set_params(asrp, n, len(n), g, len(g), salt, len(salt))))
-		#logging.debug(asrp.contents)
-		
-		# generate public key
-		client_gen_pubkey_ptr = AppleSRP.cstr_new()
-		logging.debug("SRP_gen_pub: {0}".format(AppleSRP.SRP_gen_pub(asrp, ctypes.byref(client_gen_pubkey_ptr))))
-		client_gen_pubkey = client_gen_pubkey_ptr.contents
-		logging.debug(client_gen_pubkey)
-		#logging.debug(asrp.contents)
-
-		# set password
-		password = self.password.encode("utf-8") if isinstance(self.password, str) else self.password
-		logging.debug("SRP_set_auth_password: {0}".format(AppleSRP.SRP_set_auth_password(asrp, password, len(password))))
-		#logging.debug(asrp.contents)
-		
-		# compute key
-		client_computed_key_ptr = AppleSRP.cstr_new()
-		logging.debug("SRP_compute_key: {0}".format(AppleSRP.SRP_compute_key(asrp, ctypes.byref(client_computed_key_ptr), server_pkey, len(server_pkey))))
-		client_computed_key = client_computed_key_ptr.contents
-		logging.debug(client_computed_key)
-		client_computed_key_buf = client_computed_key.get_data_buffer()
-		#logging.debug(asrp.contents)
-		
-		# generate challenge response
-		client_proof_ptr = AppleSRP.cstr_new()
-		logging.debug("SRP_respond: {0}".format(AppleSRP.SRP_respond(asrp, ctypes.byref(client_proof_ptr))))
-		client_proof = client_proof_ptr.contents
-		logging.debug(client_proof)
-		#logging.debug(asrp.contents)
-		
 		client_iv = os.urandom(0x10)
-		client_pkey = client_gen_pubkey.get_data_buffer()
-		client_proof = client_proof.get_data_buffer()
+		client_pkey, client_proof, client_computed_key_buf = srp_client.process_challenge(
+			n,
+			g,
+			salt,
+			server_pkey,
+		)
 		
 		dic = OrderedDict([(u"iv", client_iv), (u"publicKey", client_pkey), (u"state", 3), (u"response", client_proof)])
 		payload = CFLBinaryPListComposer.compose(dic)
@@ -280,14 +232,14 @@ class ACPClient(object):
 		server_iv = params2[u"iv"]
 		
 		# verify server response
-		logging.debug("SRP_verify: {0}".format(AppleSRP.SRP_verify(asrp, server_proof, len(server_proof))))
-		#logging.debug(asrp.contents)
-		
-		# cleanup
-		logging.debug("Freeing cstr(s)")
-		AppleSRP.cstr_free(client_gen_pubkey_ptr)
-		AppleSRP.cstr_free(client_computed_key_ptr)
-		AppleSRP.cstr_free(client_proof_ptr)
-		logging.debug("SRP_free: {0}".format(AppleSRP.SRP_free(asrp)))
-		
-		###self.session.enable_encryption(client_computed_key_buf, client_iv, server_iv)
+		srp_client.verify_server_proof(server_proof)
+		return client_computed_key_buf, client_iv, server_iv
+
+
+	def authenticate_AppleSRP(self, srp_client_factory=AppleSRPClient):
+		#XXX: STILL TESTING SHIT
+		srp_client = srp_client_factory("admin", self.password)
+		try:
+			return self._authenticate_srp_client(srp_client)
+		finally:
+			srp_client.close()
