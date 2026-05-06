@@ -7,13 +7,31 @@ See LICENSE
 
 ### Requirements
 
-- python 2.7
-- pycrypto
+- Modernization in progress; target runtime is Python 3.11+
+- pycryptodome
 
 
 ### Installation
 
-`python setup.py install [--user]`
+During modernization, install from the project root:
+
+`python -m pip install --no-compile .`
+
+For local development:
+
+```
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install --no-compile -e ".[dev]"
+python -m pytest
+python -m build
+```
+
+The current source still contains Python 2 runtime code. Packaging and tooling are
+being updated first so the Python 3 port can proceed behind repeatable checks.
+The `--no-compile` flag avoids byte-compiling legacy Python 2 modules during this
+intermediate step.
 
 
 ### Usage

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  packaging:
+    name: Packaging and tooling
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install development tools
+        run: python -m pip install -U pip build pytest ruff
+
+      - name: Run metadata tests
+        run: python -m pytest
+
+      - name: Lint packaging scaffold
+        run: python -m ruff check setup.py tests
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Install wheel without byte-compiling legacy Python 2 source
+        run: python -m pip install --no-compile dist/*.whl
+
+      - name: Check installed dependencies
+        run: python -m pip check
