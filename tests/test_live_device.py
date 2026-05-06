@@ -1,4 +1,6 @@
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -86,3 +88,32 @@ def test_live_srp_reads_property_catalog():
 
     assert isinstance(prop.value, str)
     assert "syNm" in prop.value
+
+
+def test_live_cli_srp_reads_device_name():
+    config = _live_config()
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "acp",
+            "--auth-mode",
+            "srp",
+            "--getprop",
+            "syNm",
+            "-t",
+            config["host"],
+            "-p",
+            config["password"],
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    value = result.stdout.strip()
+    assert value
+    if config["expected_synm"]:
+        assert value == config["expected_synm"]
