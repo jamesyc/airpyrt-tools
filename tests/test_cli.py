@@ -149,6 +149,17 @@ def test_run_help_lists_srp_test_command():
     assert "--srp-test" in stdout.getvalue()
 
 
+def test_run_help_shows_metavars_for_short_and_long_options():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(["--help"], stdout=stdout, stderr=stderr)
+
+    assert status == 0
+    assert "-t address, --target address" in stdout.getvalue()
+    assert "-p password, --password password" in stdout.getvalue()
+
+
 def test_run_reconfigures_logging_for_each_stderr_stream(monkeypatch):
     def handler(unused):
         logging.warning("handler warning")

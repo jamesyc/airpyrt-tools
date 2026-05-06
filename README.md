@@ -48,8 +48,9 @@ python -m pip install -e ".[dev]"
       -h, --help            show this help message and exit
 
     AirPort client parameters:
-      -t, --target address  IP address or hostname of the target router
-      -p, --password password
+      -t address, --target address
+                            IP address or hostname of the target router
+      -p password, --password password
                             router admin password
       -v, --verbose         enable debug logging
 
