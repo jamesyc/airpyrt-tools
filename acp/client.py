@@ -54,7 +54,7 @@ class ACPClient(object):
 		reply_header = ACPMessage.parse_raw(raw_reply)
 		
 		if reply_header.error_code != 0:
-			print "get_properties error code: {0:#x}".format(reply_header.error_code)
+			print("get_properties error code: {0:#x}".format(reply_header.error_code))
 			#XXX: blah, what to do...
 			return []
 		
@@ -71,7 +71,7 @@ class ACPClient(object):
 			
 			if flags & 1:
 				(error_code, ) = struct.unpack(">I", prop_data)
-				print "error requesting value for property \"{0}\": {1:#x}".format(name, error_code)
+				print("error requesting value for property \"{0}\": {1:#x}".format(name, error_code))
 				continue
 			
 			prop = ACPProperty(name, prop_data)
@@ -90,7 +90,7 @@ class ACPClient(object):
 	
 	def set_properties(self, props_dict={}):
 		payload = ""
-		for name, prop in props_dict.iteritems():
+		for name, prop in props_dict.items():
 			logging.debug("prop: {0!r}".format(prop))
 			payload += ACPProperty.compose_raw_element(0, prop)
 		request = ACPMessage.compose_setprop_command(0, self.password, payload)
@@ -100,7 +100,7 @@ class ACPClient(object):
 		reply_header = ACPMessage.parse_raw(raw_reply)
 		
 		if reply_header.error_code != 0:
-			print "set_properties error code: {0:#x}".format(reply_header.error_code)
+			print("set_properties error code: {0:#x}".format(reply_header.error_code))
 			#XXX: blah, what to do...
 			return
 		
@@ -115,7 +115,7 @@ class ACPClient(object):
 		
 		if flags & 1:
 			(error_code, ) = struct.unpack(">I", prop_data)
-			print "error setting value for property \"{0}\": {1:#x}".format(name, error_code)
+			print("error setting value for property \"{0}\": {1:#x}".format(name, error_code))
 			return
 			
 		prop = ACPProperty(name, prop_data)
@@ -260,4 +260,3 @@ class ACPClient(object):
 		logging.debug("SRP_free: {0}".format(AppleSRP.SRP_free(asrp)))
 		
 		###self.session.enable_encryption(client_computed_key_buf, client_iv, server_iv)
-

@@ -2,7 +2,6 @@ import logging
 import struct
 from collections import OrderedDict
 from math  import log
-from types import *
 
 
 _header_magic = "CFB0"
@@ -48,16 +47,16 @@ class CFLBinaryPListComposer(object):
 		
 		object_type = type(obj)
 		
-		if	 object_type == NoneType:
+		if	 object_type == type(None):
 			data += "\x00"
 		
-		elif object_type == BooleanType:
+		elif object_type == bool:
 			if not obj:
 				data += "\x08"
 			else:
 				data += "\x09"
 		
-		elif object_type == IntType:
+		elif object_type == int:
 			object_marker = 0x10
 			buf = ""
 			#XXX: need to actually catch unsupported packed sizes
@@ -75,7 +74,7 @@ class CFLBinaryPListComposer(object):
 			data += chr(object_marker)
 			data += buf
 		
-		elif object_type == FloatType:
+		elif object_type == float:
 			object_marker = 0x20
 			buf = ""
 			#XXX: need to actually catch unsupported packed sizes
@@ -95,7 +94,7 @@ class CFLBinaryPListComposer(object):
 		
 		#XXX: DateType?
 		
-		elif object_type == StringType:
+		elif object_type == bytes:
 			object_marker = 0x40
 			data_len = len(obj)
 			if data_len < 0xF:
@@ -107,20 +106,20 @@ class CFLBinaryPListComposer(object):
 				data += cls._pack_object(data_len)
 			data += obj
 		
-		elif object_type == UnicodeType:
+		elif object_type == str:
 			data += "\x70"
 			data += obj.encode("utf-8")
 			data += "\x00"
 		
-		elif object_type == ListType:
+		elif object_type == list:
 			data += "\xA0"
 			for element in obj:
 				data += cls._pack_object(element)
 			data += "\x00"
 		
-		elif object_type in [DictType, OrderedDict]:
+		elif object_type in [dict, OrderedDict]:
 			data += "\xD0"
-			for k, v in obj.iteritems():
+			for k, v in obj.items():
 				data += cls._pack_object(k)
 				data += cls._pack_object(v)
 			data += "\x00"

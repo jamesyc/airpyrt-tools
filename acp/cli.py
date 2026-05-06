@@ -23,11 +23,11 @@ def _cmd_not_implemented(*unused):
 	raise ACPCommandLineError("command handler not implemented")
 
 def _cmd_listprop(unused):
-	print "\nSupported properties:\n"
+	print("\nSupported properties:\n")
 	prop_names = ACPProperty.get_supported_property_names()
 	for name in prop_names:
-		print "{0}: {1}".format(name, ACPProperty.get_property_info_string(name, "description"))
-	print
+		print("{0}: {1}".format(name, ACPProperty.get_property_info_string(name, "description")))
+	print()
 
 def _cmd_helpprop(args):
 	prop_name = args.pop()
@@ -39,13 +39,13 @@ def _cmd_helpprop(args):
 		s += ", {0})".format(validation)
 	else:
 		s += ")"
-	print s
+	print(s)
 
 def _cmd_getprop(client, args):
 	prop_name = args.pop()
 	prop = client.get_properties([prop_name])
 	if len(prop):
-		print ACPProperty(prop_name, prop[0].value)
+		print(ACPProperty(prop_name, prop[0].value))
 
 def _cmd_setprop(client, args):
 	prop_name, prop_value = args
@@ -78,25 +78,25 @@ def _cmd_dumpprop(client, unused):
 	properties = client.get_properties(prop_names)
 	for prop in properties:
 		padded_description = ACPProperty.get_property_info_string(prop.name, "description").ljust(32, " ")
-		print "{0}: {1}".format(padded_description, prop)
+		print("{0}: {1}".format(padded_description, prop))
 
 def _cmd_acpprop(client, unused):
 	props_reply = client.get_properties(["prop"])
 	props_raw = props_reply[0].value
 	props = ""
-	for i in range(len(props_raw) / 4):
+	for i in range(len(props_raw) // 4):
 		props += "{0}\n".format(props_raw[i*4:i*4+4])
-	print props
+	print(props)
 
 def _cmd_dump_syslog(client, unused):
-	print "{0}".format(client.get_properties(["logm"])[0])
+	print("{0}".format(client.get_properties(["logm"])[0]))
 
 def _cmd_reboot(client, unused):
-	print "Rebooting device"	
+	print("Rebooting device")
 	client.set_properties({"acRB" : ACPProperty("acRB", 0)})
 
 def _cmd_factory_reset(client, unused):
-	print "Performing factory reset"	
+	print("Performing factory reset")
 	client.set_properties(OrderedDict([("acRF",ACPProperty("acRF", 0)), ("acRB",ACPProperty("acRB", 0))]))
 
 def _cmd_flash_primary(client, args):
@@ -104,13 +104,13 @@ def _cmd_flash_primary(client, args):
 	if os.path.exists(fw_path):
 		with open(fw_path, "rb") as fw_file:
 			fw_data = fw_file.read()
-		print "Flashing primary firmware partition"
+		print("Flashing primary firmware partition")
 		client.flash_primary(fw_data)
 	else:
 		logging.error("Basebinary not readable at path: {0}".format(fw_path))
 
 def _cmd_do_feat_command(client, unused):
-	print client.get_features()
+	print(client.get_features())
 
 def _cmd_decrypt(args):
 	(inpath, outpath) = args
@@ -141,7 +141,7 @@ def _cmd_extract(args):
 			outfile.write(outdata)
 
 def _cmd_srp_test(client, unused):
-	print "SRP testing"
+	print("SRP testing")
 	client.authenticate_AppleSRP()
 	client.close()
 
