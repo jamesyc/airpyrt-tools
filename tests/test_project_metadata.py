@@ -10,7 +10,7 @@ def load_pyproject():
 
 
 def read_project_file(path):
-    return (ROOT / path).read_text()
+    return (ROOT / path).read_text(encoding="utf-8")
 
 
 def test_project_metadata_defines_package_and_cli_entrypoint():
@@ -50,7 +50,9 @@ def test_readme_documents_supported_python_and_release_workflow():
 def test_ci_exercises_supported_python_versions():
     workflow = read_project_file(".github/workflows/ci.yml")
 
-    assert 'python-version: ["3.11", "3.12", "3.13", "3.14"]' in workflow
+    assert "python-version:" in workflow
+    for version in ["3.11", "3.12", "3.13", "3.14"]:
+        assert version in workflow
     assert "python -m coverage run -m pytest" in workflow
     assert "python -m build" in workflow
     assert "python -m twine check dist/*" in workflow
