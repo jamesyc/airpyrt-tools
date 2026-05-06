@@ -48,9 +48,8 @@ def _sha1_int(*parts):
 def _xor_bytes(left, right):
     if len(left) != len(right):
         raise ValueError("byte strings must have equal length")
-    return bytes(
-        left_byte ^ right_byte for left_byte, right_byte in zip(left, right, strict=True)
-    )
+    pairs = zip(left, right)  # noqa: B905 - lengths checked above; strict is 3.10+.
+    return bytes(left_byte ^ right_byte for left_byte, right_byte in pairs)
 
 
 def _calculate_x(username, password, salt):
