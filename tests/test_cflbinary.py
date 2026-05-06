@@ -36,3 +36,13 @@ def test_parser_rejects_bad_header_and_footer():
 
     with pytest.raises(CFLBinaryPListParseError, match="bad footer magic"):
         CFLBinaryPListParser.parse(b"CFB0\x00BAD!")
+
+
+def test_parser_rejects_unterminated_utf8_string():
+    with pytest.raises(CFLBinaryPListParseError, match="unterminated UTF-8 string"):
+        CFLBinaryPListParser.parse(b"CFB0pabcEND!")
+
+
+def test_parser_rejects_malformed_utf8_string():
+    with pytest.raises(CFLBinaryPListParseError, match="failed to decode UTF-8 string"):
+        CFLBinaryPListParser.parse(b"CFB0p\xff\x00END!")

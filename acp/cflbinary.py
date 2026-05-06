@@ -295,11 +295,15 @@ class CFLBinaryPListParser(object):
 			raw = bytearray()
 			while True:
 				byte, data = _lslice(data, 1)
+				if byte == b"":
+					raise CFLBinaryPListParseError("unterminated UTF-8 string")
 				if byte == b"\x00":
 					break
 				raw += byte
-			#XXX: what exceptions could we get here?
-			obj = bytes(raw).decode("utf-8")
+			try:
+				obj = bytes(raw).decode("utf-8")
+			except UnicodeDecodeError:
+				raise CFLBinaryPListParseError("failed to decode UTF-8 string")
 			return obj, data
 		
 		elif object_type == 0x80:      # uid
