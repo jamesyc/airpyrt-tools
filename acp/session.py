@@ -83,7 +83,7 @@ class _ACPSession(object):
 				try:
 					#XXX: this is broken for server receiving stream headers
 					data = self.sock.recv(size - recvd_size)
-				except OSError:
+				except BlockingIOError:
 					time.sleep(min(0.01, timeout))
 					continue
 

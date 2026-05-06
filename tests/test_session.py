@@ -72,6 +72,20 @@ def test_recv_timeout_restores_blocking_mode(monkeypatch):
     assert acp_session.sock.blocking == [0, 1]
 
 
+def test_recv_timeout_does_not_retry_fatal_socket_errors():
+    class ResetSocket(FakeSocket):
+        def recv(self, size):
+            raise ConnectionResetError("connection reset")
+
+    acp_session = _ACPSession("target", "password")
+    acp_session.sock = ResetSocket()
+
+    with pytest.raises(ConnectionResetError, match="connection reset"):
+        acp_session.recv(1, timeout=1)
+
+    assert acp_session.sock.blocking == [0, 1]
+
+
 def test_recv_without_socket_returns_empty_bytes():
     assert _ACPSession("target", "password").recv(4) == b""
 
