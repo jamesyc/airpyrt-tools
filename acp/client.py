@@ -99,7 +99,11 @@ class ACPClient(object):
 			logging.debug("prop_data {0!r}".format(prop_data))
 			
 			if flags & 1:
-				self._unpack_property_error("requesting value", name, prop_data)
+				try:
+					self._unpack_property_error("requesting value", name, prop_data)
+				except ACPClientError as e:
+					logging.warning(str(e))
+					continue
 			
 			prop = ACPProperty(name, prop_data)
 			logging.debug("prop {0!r}".format(prop))

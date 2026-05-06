@@ -1,4 +1,5 @@
 import builtins
+import logging
 import struct
 
 import pytest
@@ -10,8 +11,17 @@ from acp.property import ACPProperty
 
 
 class FakeACPServer:
-    def __init__(self, *, get_props=None, error_code=0, max_chunk=None, truncate_reply_to=None):
+    def __init__(
+        self,
+        *,
+        get_props=None,
+        get_prop_errors=None,
+        error_code=0,
+        max_chunk=None,
+        truncate_reply_to=None,
+    ):
         self.get_props = get_props or []
+        self.get_prop_errors = get_prop_errors or []
         self.error_code = error_code
         self.max_chunk = max_chunk
         self.truncate_reply_to = truncate_reply_to
@@ -23,6 +33,9 @@ class FakeACPServer:
         if request.command == 0x14:
             reply = stream_header(0x14, self.error_code)
             if self.error_code == 0:
+                for name, error_code in self.get_prop_errors:
+                    reply += ACPProperty.compose_raw_element_header(name, 1, 4)
+                    reply += struct.pack(">I", error_code)
                 for prop in self.get_props:
                     reply += ACPProperty.compose_raw_element(0, prop)
                 reply += ACPProperty.compose_raw_element(0, ACPProperty())
@@ -109,16 +122,19 @@ def test_get_properties_raises_client_error_for_reply_error_code():
         client.get_properties(["syNm"])
 
 
-def test_get_properties_raises_client_error_for_property_error_flag():
-    error_element = (
-        ACPProperty.compose_raw_element_header("syNm", 1, 4) + struct.pack(">I", 0x5678)
+def test_get_properties_logs_property_error_and_continues(caplog):
+    server = FakeACPServer(
+        get_prop_errors=[("syNm", 0x5678)],
+        get_props=[ACPProperty("syUT", 42)],
     )
-    server = FakeACPServer(get_props=[])
     client = client_with_fake_server(server)
-    client.session.sock.reply += stream_header(0x14) + error_element
 
-    with pytest.raises(ACPClientError, match="error requesting value"):
-        client.get_properties(["syNm"])
+    with caplog.at_level(logging.WARNING):
+        props = client.get_properties(["syNm", "syUT"])
+
+    assert [prop.name for prop in props] == ["syUT"]
+    assert props[0].value == 42
+    assert "error requesting value for property \"syNm\": 0x5678" in caplog.text
 
 
 def test_get_properties_raises_session_error_for_short_server_reply():
