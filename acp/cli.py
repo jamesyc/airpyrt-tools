@@ -329,7 +329,11 @@ def build_parser():
 
 def _configure_logging(verbose):
     level = logging.DEBUG if verbose else logging.WARNING
-    logging.basicConfig(format="%(levelname)s:%(message)s", level=level)
+    logging.basicConfig(
+        format="%(levelname)s:%(message)s",
+        level=level,
+        force=True,
+    )
 
 
 def _selected_commands(args_dict):

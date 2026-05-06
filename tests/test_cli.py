@@ -1,4 +1,5 @@
 import io
+import logging
 
 import pytest
 
@@ -135,6 +136,22 @@ def test_run_parser_errors_return_argparse_status_code():
 
     assert status == 2
     assert "expected 1 argument" in stderr.getvalue()
+
+
+def test_run_reconfigures_logging_for_each_stderr_stream(monkeypatch):
+    def handler(unused):
+        logging.warning("handler warning")
+
+    monkeypatch.setitem(cli.COMMANDS, "listprop", (cli.LOCAL, handler))
+    stdout = io.StringIO()
+    first_stderr = io.StringIO()
+    second_stderr = io.StringIO()
+
+    assert cli.run(["--listprop"], stdout=stdout, stderr=first_stderr) == 0
+    assert cli.run(["--listprop"], stdout=stdout, stderr=second_stderr) == 0
+
+    assert first_stderr.getvalue() == "WARNING:handler warning\n"
+    assert second_stderr.getvalue() == "WARNING:handler warning\n"
 
 
 def test_main_exits_with_run_status(monkeypatch):
