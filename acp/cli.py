@@ -13,6 +13,8 @@ from .property import ACPProperty
 LOCAL = "local"
 REMOTE_NOAUTH = "remote_noauth"
 REMOTE_ADMIN = "remote_admin"
+AUTH_LEGACY = "legacy"
+AUTH_SRP = "srp"
 
 
 class _ArgParser(argparse.ArgumentParser):
@@ -205,11 +207,6 @@ def _cmd_extract(args):
     Path(outpath).write_bytes(outdata)
 
 
-def _cmd_srp_test(client, unused):
-    print("SRP testing")
-    client.authenticate_AppleSRP()
-
-
 COMMANDS = {
     "listprop": (LOCAL, _cmd_listprop),
     "helpprop": (LOCAL, _cmd_helpprop),
@@ -224,7 +221,6 @@ COMMANDS = {
     "do_feat_command": (REMOTE_NOAUTH, _cmd_do_feat_command),
     "decrypt": (LOCAL, _cmd_decrypt),
     "extract": (LOCAL, _cmd_extract),
-    "srp_test": (REMOTE_ADMIN, _cmd_srp_test),
 }
 
 
@@ -249,6 +245,12 @@ def build_parser():
         "--verbose",
         action="store_true",
         help="enable debug logging",
+    )
+    parameters_group.add_argument(
+        "--auth-mode",
+        choices=[AUTH_LEGACY, AUTH_SRP],
+        default=AUTH_LEGACY,
+        help="remote authentication mode",
     )
 
     airport_client_group = parser.add_argument_group("AirPort client commands")
@@ -333,14 +335,6 @@ def build_parser():
         help="extract the gzimg contents",
     )
 
-    test_group = parser.add_argument_group("Test arguments")
-    test_group.add_argument(
-        "--srp-test",
-        action="store_const",
-        const=True,
-        help="SRP (requires OS X)",
-    )
-
     return parser
 
 
@@ -365,20 +359,32 @@ def _run_local(handler, arg):
     handler(arg)
 
 
-def _run_remote(handler, arg, mode, target, password, client_factory):
-    if mode == REMOTE_NOAUTH:
-        if target is None:
-            raise ACPCommandLineError("must specify a target")
-        client = client_factory(target)
-    elif mode == REMOTE_ADMIN:
+def _remote_requires_admin_password(mode, auth_mode):
+    return auth_mode == AUTH_SRP or mode == REMOTE_ADMIN
+
+
+def _validate_remote_credentials(mode, target, password, auth_mode):
+    if mode not in (REMOTE_NOAUTH, REMOTE_ADMIN):
+        raise ACPCommandLineError(f"unknown command type: {mode}")
+
+    if _remote_requires_admin_password(mode, auth_mode):
         if target is None or password is None:
             raise ACPCommandLineError("must specify a target and administrator password")
+    elif target is None:
+        raise ACPCommandLineError("must specify a target")
+
+
+def _run_remote(handler, arg, mode, target, password, auth_mode, client_factory):
+    _validate_remote_credentials(mode, target, password, auth_mode)
+    if _remote_requires_admin_password(mode, auth_mode):
         client = client_factory(target, password)
     else:
-        raise ACPCommandLineError(f"unknown command type: {mode}")
+        client = client_factory(target)
 
     try:
         client.connect()
+        if auth_mode == AUTH_SRP:
+            client.authenticate_srp()
         handler(client, arg)
     finally:
         client.close()
@@ -404,6 +410,7 @@ def _run_args(args, client_factory):
             mode,
             args.target,
             args.password,
+            args.auth_mode,
             client_factory,
         )
 

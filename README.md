@@ -36,13 +36,12 @@ python -m pip install -e ".[dev]"
 
 `python -m acp --help`
 
-    usage: acp [-h] [-t address] [-p password] [-v] [--listprop]
-               [--helpprop property] [--getprop property]
-               [--setprop property value] [--dumpprop] [--acpprop]
-               [--dump-syslog] [--reboot] [--factory-reset]
-               [--flash-primary firmware_path] [--do-feat-command]
-               [--decrypt inpath outpath] [--extract inpath outpath]
-               [--srp-test]
+    usage: acp [-h] [-t address] [-p password] [-v] [--auth-mode {legacy,srp}]
+               [--listprop] [--helpprop property] [--getprop property]
+               [--setprop property value] [--dumpprop] [--acpprop] [--dump-syslog]
+               [--reboot] [--factory-reset] [--flash-primary firmware_path]
+               [--do-feat-command] [--decrypt inpath outpath]
+               [--extract inpath outpath]
 
     options:
       -h, --help            show this help message and exit
@@ -53,6 +52,8 @@ python -m pip install -e ".[dev]"
       -p password, --password password
                             router admin password
       -v, --verbose         enable debug logging
+      --auth-mode {legacy,srp}
+                            remote authentication mode
 
     AirPort client commands:
       --listprop            list supported properties
@@ -75,10 +76,6 @@ python -m pip install -e ".[dev]"
       --extract inpath outpath
                             extract the gzimg contents
 
-    Test arguments:
-      --srp-test            SRP (requires OS X)
-
-
 ### Examples
 
 List supported property names:
@@ -100,6 +97,12 @@ acp --getprop syNm --target 10.0.1.1 --password "$AIRPORT_PASSWORD"
 acp --setprop syNm "Office Router" --target 10.0.1.1 --password "$AIRPORT_PASSWORD"
 ```
 
+Use portable SRP/protocol v2 authentication for normal remote commands:
+
+```
+acp --auth-mode srp --getprop syNm --target 10.0.1.1 --password "$AIRPORT_PASSWORD"
+```
+
 Work with basebinary firmware files:
 
 ```
@@ -118,7 +121,7 @@ debug logging while investigating failures.
 python -m pytest
 python -m coverage run -m pytest
 python -m coverage report
-python -m ruff check acp/cli.py setup.py tests
+python -m ruff check acp/cli.py acp/srp.py setup.py tests
 python -m compileall -q acp
 python -m build
 python -m twine check dist/*
@@ -126,20 +129,20 @@ python -m pip install --force-reinstall dist/*.whl
 python -m pip check
 ```
 
-The current ruff target covers the package entrypoint, packaging shim, and tests.
-The older protocol modules still need a separate whole-package lint cleanup pass.
+The current ruff target covers the package entrypoint, SRP backend, packaging
+shim, and tests. The older protocol modules still need a separate whole-package
+lint cleanup pass.
 
 
 ### Notes
 
 **IMPORTANT**
 
-This still uses the old ACP protocol implementation, which puts the admin password
-of the device over the wire in a trivially recoverable format. The newer protocol
-uses SRP authentication and better encryption of requests to/from the device.
-Until SRP/protocol v2 authentication and full session encryption are implemented,
-remote administration with this tool should be treated as unsafe on untrusted
-networks.
+The default remote authentication mode still uses the old ACP protocol
+implementation, which puts the admin password of the device over the wire in a
+trivially recoverable format. Use `--auth-mode srp` to authenticate with
+portable SRP/protocol v2 and enable full-session encryption before running the
+selected remote command. Treat the legacy mode as unsafe on untrusted networks.
 
 The original project grew organically out of the author's understanding of various
 pieces of the ACP protocol. It was restructured a few times as that understanding
@@ -150,13 +153,6 @@ current Python 3.
 Return value of 0xfffffff6 when using --getprop means the property is not
 available/readable.
 
-The AppleSRP ctypes path is experimental and depends on Apple's private macOS
-AppleSRP framework. It remains available through --srp-test for protocol
-experiments; portable SRP support is still future work.
-
-SRP/protocol v2 authentication and full session encryption are not implemented.
-
-
 ## TODO (very incomplete list in no particular order)
 
 - add IP address type for properties, make sure it supports IPv4 and IPv6
@@ -166,14 +162,13 @@ SRP/protocol v2 authentication and full session encryption are not implemented.
   - finish adding custom exception classes and make sure we're using them
 - logging (mostly done, still looks horrible) with verbosity controls
 - review and update docstrings
-- SRP support (fix pysrp because ctypes hax, while fun, are horrible and non-portable)
-- ACP protocol version 2 (full session encryption)
+- broaden SRP/protocol v2 device coverage
 - handle encrypted property elements
 - basebinary repacking/reencryption
 - basebinary rootfs mounting
 - threaded server
 - handle protocol v1 (for old firmwares/devices)
 - bonjour announcement/discovery
-- options to specify no encryption, old method, and new (SRP) method
+- option to specify no authentication for commands that support it
 - ACPMonitorSession support
 - ACPRPC support

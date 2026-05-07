@@ -107,3 +107,19 @@ def test_client_session_enable_encryption_sets_bound_methods(monkeypatch):
 
     assert acp_session.encrypt_method(b"payload") == b"client:payload"
     assert acp_session.decrypt_method(b"server:payload") == b"payload"
+
+
+def test_close_clears_socket_and_encryption_state(monkeypatch):
+    monkeypatch.setattr(session, "ACPEncryption", FakeEncryption)
+    acp_session = ACPClientSession("target", "password")
+    fake_socket = FakeSocket()
+    acp_session.sock = fake_socket
+    acp_session.enable_encryption(b"key", b"client-iv", b"server-iv")
+
+    acp_session.close()
+
+    assert fake_socket.closed is True
+    assert acp_session.sock is None
+    assert acp_session.encryption_context is None
+    assert acp_session.encrypt_method is None
+    assert acp_session.decrypt_method is None

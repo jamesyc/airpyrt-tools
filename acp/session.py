@@ -16,11 +16,11 @@ class _ACPSession(object):
 		
 		self.sock = None
 		
-		#self.encryption_context = None
+		self.encryption_context = None
 		self.encrypt_method = None
 		self.decrypt_method = None
 		
-		#XXX: AppleSRP hax
+		#XXX: SRP hax
 		#self.SRP = None
 		#self.state = 0
 	
@@ -36,6 +36,9 @@ class _ACPSession(object):
 		if self.sock:
 			self.sock.close()
 			self.sock = None
+		self.encryption_context = None
+		self.encrypt_method = None
+		self.decrypt_method = None
 	
 	
 	def send(self, data):
