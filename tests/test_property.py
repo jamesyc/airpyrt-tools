@@ -111,3 +111,11 @@ def test_null_property_marker_round_trips_to_empty_property():
     assert ACPProperty.compose_raw_element(0, prop) == (
         b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00"
     )
+
+
+def test_property_element_flag_helpers_name_supported_and_unknown_bits():
+    assert ACPProperty.element_has_error(ACPProperty.ELEMENT_FLAG_ERROR) is True
+    assert ACPProperty.unsupported_element_flags(0) == 0
+    assert ACPProperty.unsupported_element_flags(ACPProperty.ELEMENT_FLAG_ERROR) == 0
+    assert ACPProperty.unsupported_element_flags(0x2) == 0x2
+    assert ACPProperty.unsupported_element_flags(0x3) == 0x2

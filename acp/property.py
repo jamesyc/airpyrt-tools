@@ -611,6 +611,8 @@ class ACPProperty:
 	_element_header_format = struct.Struct("!4s2I")
 	element_header_size = _element_header_format.size
 	_null_raw_value = b"\x00\x00\x00\x00"
+	ELEMENT_FLAG_ERROR = 0x1
+	KNOWN_ELEMENT_FLAGS = ELEMENT_FLAG_ERROR
 
 	@staticmethod
 	def _name_to_wire(name):
@@ -631,6 +633,14 @@ class ACPProperty:
 		if isinstance(name, bytes):
 			return name.decode("ascii")
 		return name
+
+	@classmethod
+	def element_has_error(cls, flags):
+		return bool(flags & cls.ELEMENT_FLAG_ERROR)
+
+	@classmethod
+	def unsupported_element_flags(cls, flags):
+		return flags & ~cls.KNOWN_ELEMENT_FLAGS
 	
 	
 	def __init__(self, name=None, value=None):
