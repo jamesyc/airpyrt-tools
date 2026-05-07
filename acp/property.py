@@ -583,12 +583,14 @@ def _get_validation_rule(validation):
 	return _validation_rules[validation]
 
 
-def _generate_acp_property_dict():	
+def _generate_acp_property_dict():
 	props = {}
 	for (name, type, description, validation) in _acp_properties:
 		# basic validation of tuples
 		assert len(name) == 4, f"bad name in _acp_properties list: {name}"
-		assert type in ["str", "dec", "hex", "log", "mac", "cfb", "bin"], f"bad type in _acp_properties list for name: {name}"
+		assert type in ["str", "dec", "hex", "log", "mac", "cfb", "bin"], (
+			f"bad type in _acp_properties list for name: {name}"
+		)
 		assert description, f"missing description in _acp_properties list for name: {name}"
 		props[name] = dict(
 			type=type,
@@ -646,19 +648,26 @@ class ACPProperty:
 			# accept value as packed binary string or Python type
 			prop_type = self.get_property_info_string(name, "type")
 			_init_handler_name = f"_init_{prop_type}"
-			assert hasattr(self, _init_handler_name), f"missing init handler for \"{prop_type}\" property type"
+			assert hasattr(self, _init_handler_name), (
+				f"missing init handler for \"{prop_type}\" property type"
+			)
 			_init_handler = getattr(self, _init_handler_name)
 			
 			logging.debug(f"old value: {value!r} type: {type(value)}")
 			try:
 				value = _init_handler(value)
 			except ACPPropertyInitValueError as e:
-				raise ACPPropertyError(f"{e!s} provided for \"{prop_type}\" property type: {value!r}") from e
+				raise ACPPropertyError(
+					f"{e!s} provided for \"{prop_type}\" property type: {value!r}"
+				) from e
 			logging.debug(f"new value: {value!r} type: {type(value)}")
 			
 			validator = self.get_property_validator(name)
 			if validator and not validator(value):
-				raise ACPPropertyError(f"invalid value passed to initializer for property \"{name}\": {repr(value)}")
+				raise ACPPropertyError(
+					f"invalid value passed to initializer for property \"{name}\": "
+					f"{value!r}"
+				)
 		
 		self.name = name
 		self.value = value
@@ -738,8 +747,8 @@ class ACPProperty:
 		#XXX: return tuple or dict?
 		return repr((self.name, self.value))
 	
-	
-	#TODO: make this function return something other than the formatted value of the property...I keep getting confused by its current shittiness
+	#TODO: make this function return something other than the formatted value
+	# of the property. The current behavior is confusing.
 	def __str__(self):
 		#XXX: is this the correct thing to do?
 		if self.name is None or self.value is None:
@@ -747,7 +756,9 @@ class ACPProperty:
 		
 		prop_type = self.get_property_info_string(self.name, "type")
 		_format_handler_name = f"_format_{prop_type}"
-		assert hasattr(self, _format_handler_name), f"missing format handler for \"{prop_type}\" property type"
+		assert hasattr(self, _format_handler_name), (
+			f"missing format handler for \"{prop_type}\" property type"
+		)
 		return getattr(self, _format_handler_name)(self.value)
 	
 	def _format_dec(self, value):
@@ -760,7 +771,7 @@ class ACPProperty:
 		mac_bytes = []
 		for i in range(6):
 			mac_bytes.append(f"{value[i]:02x}")
-		return "{0}:{1}:{2}:{3}:{4}:{5}".format(*mac_bytes)
+		return ":".join(mac_bytes)
 	
 	def _format_bin(self, value):
 		return value.hex()
@@ -771,7 +782,8 @@ class ACPProperty:
 	def _format_log(self, value):
 		s = ""
 		for line in value.strip(b"\x00").split(b"\x00"):
-			s += "{0}\n".format(line.decode("utf-8", errors="replace"))
+			decoded_line = line.decode("utf-8", errors="replace")
+			s += f"{decoded_line}\n"
 		return s
 	
 	def _format_str(self, value):

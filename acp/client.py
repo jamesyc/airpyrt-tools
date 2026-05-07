@@ -82,9 +82,9 @@ class ACPClient:
 		while True:
 			prop_header = self.recv_property_element_header()
 			name, flags, size = ACPProperty.parse_raw_element_header(prop_header)
-			logging.debug("name  ")
-			logging.debug("flags ")
-			logging.debug("size  ")
+			logging.debug(f"name  {name!r}")
+			logging.debug(f"flags {flags!r}")
+			logging.debug(f"size  {size!r}")
 			
 			prop_data = self.recv(size)
 			logging.debug(f"prop_data {prop_data!r}")
@@ -114,7 +114,7 @@ class ACPClient:
 		if props_dict is None:
 			props_dict = {}
 		payload = b""
-		for name, prop in props_dict.items():
+		for _name, prop in props_dict.items():
 			logging.debug(f"prop: {prop!r}")
 			payload += ACPProperty.compose_raw_element(0, prop)
 		request = ACPMessage.compose_setprop_command(0, self.password, payload)

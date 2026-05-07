@@ -267,7 +267,9 @@ class CFLBinaryPListParser:
 			elif object_info == 0x09: # bool, true
 				return True, data
 			else:
-				raise CFLBinaryPListParseError(f"unsupported object info value for object type 0x00: {object_info:#x}")
+				raise CFLBinaryPListParseError(
+					f"unsupported object info value for object type 0x00: {object_info:#x}"
+				)
 		
 		elif object_type == 0x10:     # int, big-endian
 			return cls._unpack_int(object_info, data)
@@ -314,7 +316,7 @@ class CFLBinaryPListParser:
 			obj = []
 			while True:
 				element, data = cls._unpack_object(data)
-				if element == None:
+				if element is None:
 					break
 				obj.append(element)
 			return obj, data
@@ -330,7 +332,7 @@ class CFLBinaryPListParser:
 			values = []
 			while True:
 				key, data = cls._unpack_object(data)
-				if key == None:
+				if key is None:
 					break
 				keys.append(key)
 				

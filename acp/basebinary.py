@@ -62,7 +62,16 @@ class Basebinary:
 		#XXX: and here??
 		stored_checksum, = struct.unpack(">I", data[-4:])
 		
-		(byte_0x0F, model, version, byte_0x18, byte_0x19, byte_0x1A, flags, unk_0x1C) = cls.parse_header(header_data)
+		(
+			byte_0x0F,
+			model,
+			version,
+			byte_0x18,
+			byte_0x19,
+			byte_0x1A,
+			flags,
+			unk_0x1C,
+		) = cls.parse_header(header_data)
 		
 		if flags & 2:
 			inner_data = cls.decrypt(inner_data, model, byte_0x0F)
@@ -87,7 +96,17 @@ class Basebinary:
 	@classmethod
 	def parse_header(cls, data):
 		try:
-			magic, byte_0x0F, model, version, byte_0x18, byte_0x19, byte_0x1A, flags, unk_0x1C = cls._header_format.unpack(data)
+			(
+				magic,
+				byte_0x0F,
+				model,
+				version,
+				byte_0x18,
+				byte_0x19,
+				byte_0x1A,
+				flags,
+				unk_0x1C,
+			) = cls._header_format.unpack(data)
 		except struct.error as e:
 			raise BasebinaryError("failed to parse firmware header") from e
 		
@@ -98,7 +117,17 @@ class Basebinary:
 	
 	
 	@classmethod
-	def compose_header(cls, byte_0x0F, model, version, byte_0x18, byte_0x19, byte_0x1A, flags, unk_0x1C):
+	def compose_header(
+		cls,
+		byte_0x0F,
+		model,
+		version,
+		byte_0x18,
+		byte_0x19,
+		byte_0x1A,
+		flags,
+		unk_0x1C,
+	):
 		#TODO
 		pass
 	
@@ -115,7 +144,9 @@ class Basebinary:
 		chunk_length = 0x8000
 		while remaining_length:
 			if remaining_length > chunk_length:
-				decrypted_chunks.append(cls.decrypt_chunk(data[-remaining_length:-(remaining_length-chunk_length)], key, iv))
+				start = -remaining_length
+				end = -(remaining_length - chunk_length)
+				decrypted_chunks.append(cls.decrypt_chunk(data[start:end], key, iv))
 				remaining_length -= chunk_length
 			else:
 				decrypted_chunks.append(cls.decrypt_chunk(data[-remaining_length:], key, iv))

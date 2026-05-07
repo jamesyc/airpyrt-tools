@@ -32,7 +32,8 @@ def _generate_acp_header_key(password):
 	Encrypt password for ACP message header key field
 	
 	Note:
-		Truncates the password at 0x20 bytes, not sure if this is the right thing to use in all cases
+		Truncates the password at 0x20 bytes. It is unclear whether this is
+		right for all cases.
 	
 	Args:
 		password (str): system password of the router (syAP)
@@ -56,8 +57,9 @@ def _generate_acp_header_key(password):
 class ACPMessage:
 	"""ACP message composition and parsing"""
 	
-	#XXX: struct is stupid about unpacking unsigned ints > 0x7fffffff, so treat everything as signed and
-	#     "cast" where necessary. Should we switch to using ctypes?
+	#XXX: struct is stupid about unpacking unsigned ints > 0x7fffffff,
+	#     so treat everything as signed and "cast" where necessary.
+	#     Should we switch to using ctypes?
 	_header_format = struct.Struct("!4s8i12x32s48x")
 	_header_magic  = b"acpp"
 	
@@ -72,14 +74,14 @@ class ACPMessage:
 		self.error_code = error_code
 		
 		# body is not specified, this is a stream header
-		if body == None:
+		if body is None:
 			# the body size is already specified, don't override it
-			self.body_size = body_size if body_size != None else -1
+			self.body_size = body_size if body_size is not None else -1
 			self.body_checksum = 1 # equivalent to zlib.adler32(b"")
 		else:
 			body = _as_bytes(body)
 			# the body size is already specified, don't override it
-			self.body_size = body_size if body_size != None else len(body)
+			self.body_size = body_size if body_size is not None else len(body)
 			self.body_checksum = _adler32_i32(body)
 		
 		self.key = key
@@ -113,7 +115,18 @@ class ACPMessage:
 		# make sure there's data beyond the header before we try to access it
 		body_data = data[cls.header_size:] if len(data) > cls.header_size else None
 		
-		(magic, version, header_checksum, body_checksum, body_size, flags, unused, command, error_code, key) = cls._header_format.unpack(header_data)
+		(
+			magic,
+			version,
+			header_checksum,
+			body_checksum,
+			body_size,
+			flags,
+			unused,
+			command,
+			error_code,
+			key,
+		) = cls._header_format.unpack(header_data)
 		logging.debug("ACP message header fields, parsed not validated")
 		logging.debug(f"magic           {magic!r}")
 		logging.debug(f"header_checksum {header_checksum:#x}")
@@ -132,7 +145,18 @@ class ACPMessage:
 			raise ACPMessageError("invalid version")
 		
 		#TODO: can we zero the header_checksum field without recreating the struct (how?)
-		tmphdr = cls._header_format.pack(magic, version, 0, body_checksum, body_size, flags, unused, command, error_code, key)
+		tmphdr = cls._header_format.pack(
+			magic,
+			version,
+			0,
+			body_checksum,
+			body_size,
+			flags,
+			unused,
+			command,
+			error_code,
+			key,
+		)
 		if header_checksum != _adler32_i32(tmphdr):
 			raise ACPMessageError("header checksum does not match")
 
@@ -162,62 +186,95 @@ class ACPMessage:
 	
 	@classmethod
 	def compose_echo_command(cls, flags, password, payload):
-		return cls(0x00030001, flags, 0, 1, 0, _generate_acp_header_key(password), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 1, 0, _generate_acp_header_key(password), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_flash_primary_command(cls, flags, password, payload):
-		return cls(0x00030001, flags, 0, 3, 0, _generate_acp_header_key(password), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 3, 0, _generate_acp_header_key(password), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_flash_secondary_command(cls, flags, password, payload):
-		return cls(0x00030001, flags, 0, 5, 0, _generate_acp_header_key(password), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 5, 0, _generate_acp_header_key(password), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_flash_bootloader_command(cls, flags, password, payload):
-		return cls(0x00030001, flags, 0, 6, 0, _generate_acp_header_key(password), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 6, 0, _generate_acp_header_key(password), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_getprop_command(cls, flags, password, payload):
-		return cls(0x00030001, flags, 0, 0x14, 0, _generate_acp_header_key(password), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 0x14, 0, _generate_acp_header_key(password), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_setprop_command(cls, flags, password, payload):
-		return cls(0x00030001, flags, 0, 0x15, 0, _generate_acp_header_key(password), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 0x15, 0, _generate_acp_header_key(password), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_perform_command(cls, flags, password, payload):
-		return cls(0x00030001, flags, 0, 0x16, 0, _generate_acp_header_key(password), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 0x16, 0, _generate_acp_header_key(password), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_monitor_command(cls, flags, password, payload):
-		return cls(0x00030001, flags, 0, 0x18, 0, _generate_acp_header_key(password), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 0x18, 0, _generate_acp_header_key(password), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_rpc_command(cls, flags, password, payload):
-		return cls(0x00030001, flags, 0, 0x19, 0, _generate_acp_header_key(password), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 0x19, 0, _generate_acp_header_key(password), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_auth_command(cls, flags, payload):
-		return cls(0x00030001, flags, 0, 0x1a, 0, _generate_acp_header_key(""), payload)._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 0x1a, 0, _generate_acp_header_key(""), payload
+		)._compose_raw_packet()
 	
 	
 	@classmethod
 	def compose_feat_command(cls, flags):
-		return cls(0x00030001, flags, 0, 0x1b, 0, _generate_acp_header_key(""))._compose_raw_packet()
+		return cls(
+			0x00030001, flags, 0, 0x1b, 0, _generate_acp_header_key("")
+		)._compose_raw_packet()
 	
 	
 	@classmethod
-	def compose_message_ex(cls, version, flags, unused, command, error_code, password, payload, payload_size):
-		return cls(version, flags, unused, command, error_code, _generate_acp_header_key(password), payload, payload_size)._compose_raw_packet()
+	def compose_message_ex(
+		cls, version, flags, unused, command, error_code, password, payload, payload_size
+	):
+		return cls(
+			version,
+			flags,
+			unused,
+			command,
+			error_code,
+			_generate_acp_header_key(password),
+			payload,
+			payload_size,
+		)._compose_raw_packet()
 	
 	
 	def _compose_raw_packet(self):
@@ -241,26 +298,30 @@ class ACPMessage:
 			Bytes containing header data
 		
 		"""
-		tmphdr = self._header_format.pack(self._header_magic,
-		                                  self.version,
-		                                  0,
-		                                  self.body_checksum,
-		                                  self.body_size,
-		                                  self.flags,
-		                                  self.unused,
-		                                  self.command,
-		                                  self.error_code,
-		                                  self.key)
+		tmphdr = self._header_format.pack(
+			self._header_magic,
+			self.version,
+			0,
+			self.body_checksum,
+			self.body_size,
+			self.flags,
+			self.unused,
+			self.command,
+			self.error_code,
+			self.key,
+		)
 		
-		header = self._header_format.pack(self._header_magic,
-		                                  self.version,
-		                                  _adler32_i32(tmphdr),
-		                                  self.body_checksum,
-		                                  self.body_size,
-		                                  self.flags,
-		                                  self.unused,
-		                                  self.command,
-		                                  self.error_code,
-		                                  self.key)
+		header = self._header_format.pack(
+			self._header_magic,
+			self.version,
+			_adler32_i32(tmphdr),
+			self.body_checksum,
+			self.body_size,
+			self.flags,
+			self.unused,
+			self.command,
+			self.error_code,
+			self.key,
+		)
 		
 		return header
