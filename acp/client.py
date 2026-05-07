@@ -11,7 +11,7 @@ from .session import ACPClientSession
 from .srp import SRP6aClient
 
 
-class ACPClient(object):
+class ACPClient:
 	def __init__(self, target, password=""):
 		self.target = target
 		self.password = password
@@ -46,10 +46,7 @@ class ACPClient(object):
 	def _raise_for_reply_error(self, operation, reply_header):
 		if reply_header.error_code != 0:
 			raise ACPClientError(
-				"{0} failed with error code: {1:#x}".format(
-					operation,
-					reply_header.error_code,
-				)
+				f"{operation} failed with error code: {reply_header.error_code:#x}"
 			)
 
 
@@ -58,17 +55,10 @@ class ACPClient(object):
 			(error_code, ) = struct.unpack(">I", prop_data)
 		except struct.error as e:
 			raise ACPClientError(
-				"{0} returned a malformed property error for \"{1}\"".format(
-					operation,
-					name,
-				)
+				f"{operation} returned a malformed property error for \"{name}\""
 			) from e
 		raise ACPClientError(
-			"error {0} for property \"{1}\": {2:#x}".format(
-				operation,
-				name,
-				error_code,
-			)
+			f"error {operation} for property \"{name}\": {error_code:#x}"
 		)
 
 
@@ -92,12 +82,12 @@ class ACPClient(object):
 		while True:
 			prop_header = self.recv_property_element_header()
 			name, flags, size = ACPProperty.parse_raw_element_header(prop_header)
-			logging.debug("name  ".format(name))
-			logging.debug("flags ".format(flags))
-			logging.debug("size  ".format(size))
+			logging.debug("name  ")
+			logging.debug("flags ")
+			logging.debug("size  ")
 			
 			prop_data = self.recv(size)
-			logging.debug("prop_data {0!r}".format(prop_data))
+			logging.debug(f"prop_data {prop_data!r}")
 			
 			if flags & 1:
 				try:
@@ -107,7 +97,7 @@ class ACPClient(object):
 					continue
 			
 			prop = ACPProperty(name, prop_data)
-			logging.debug("prop {0!r}".format(prop))
+			logging.debug(f"prop {prop!r}")
 			
 			#XXX: this is still a bit ugly
 			if prop.name is None and prop.value is None:
@@ -125,7 +115,7 @@ class ACPClient(object):
 			props_dict = {}
 		payload = b""
 		for name, prop in props_dict.items():
-			logging.debug("prop: {0!r}".format(prop))
+			logging.debug(f"prop: {prop!r}")
 			payload += ACPProperty.compose_raw_element(0, prop)
 		request = ACPMessage.compose_setprop_command(0, self.password, payload)
 		self.send(request)
@@ -137,18 +127,18 @@ class ACPClient(object):
 		
 		prop_header = self.recv_property_element_header()
 		name, flags, size = ACPProperty.parse_raw_element_header(prop_header)
-		logging.debug("name  {0!r}".format(name))
-		logging.debug("flags {0!r}".format(flags))
-		logging.debug("size  {0!r}".format(size))
+		logging.debug(f"name  {name!r}")
+		logging.debug(f"flags {flags!r}")
+		logging.debug(f"size  {size!r}")
 		
 		prop_data = self.recv(size)
-		logging.debug("prop_data {0!r}".format(prop_data))
+		logging.debug(f"prop_data {prop_data!r}")
 		
 		if flags & 1:
 			self._unpack_property_error("setting value", name, prop_data)
 			
 		prop = ACPProperty(name, prop_data)
-		logging.debug("prop {0!r}".format(prop))
+		logging.debug(f"prop {prop!r}")
 		
 		#XXX: this is still a bit ugly
 		if prop.name is None and prop.value is None:
@@ -176,7 +166,7 @@ class ACPClient(object):
 	
 	
 	def _authenticate_srp_client(self, username, srp_client, operation):
-		dic = OrderedDict([(u"state", 1), (u"username", username)])
+		dic = OrderedDict([("state", 1), ("username", username)])
 		payload = CFLBinaryPListComposer.compose(dic)
 		raw_message = ACPMessage.compose_auth_command(4, payload)
 		self.send(raw_message)
@@ -186,21 +176,21 @@ class ACPClient(object):
 		
 		self._raise_for_reply_error(operation, reply_header)
 		
-		logging.debug("recv_size: {0}".format(reply_header.body_size))
+		logging.debug(f"recv_size: {reply_header.body_size}")
 		raw_message = self.recv(reply_header.body_size)
-		logging.debug("raw_message: {0!r}".format(raw_message))
+		logging.debug(f"raw_message: {raw_message!r}")
 		params1 = CFLBinaryPListParser.parse(raw_message)
 		logging.debug(params1)
 		
-		n = self._require_auth_field(operation, params1, u"modulus")
-		g = self._require_auth_field(operation, params1, u"generator")
-		salt = self._require_auth_field(operation, params1, u"salt")
-		server_pkey = self._require_auth_field(operation, params1, u"publicKey")
+		n = self._require_auth_field(operation, params1, "modulus")
+		g = self._require_auth_field(operation, params1, "generator")
+		salt = self._require_auth_field(operation, params1, "salt")
+		server_pkey = self._require_auth_field(operation, params1, "publicKey")
 		
-		logging.debug("nhex: {0}".format(n.hex()))
-		logging.debug("ghex: {0}".format(g.hex()))
-		logging.debug("salt: {0}".format(salt.hex()))
-		logging.debug("server_pkey: {0}".format(server_pkey.hex()))
+		logging.debug(f"nhex: {n.hex()}")
+		logging.debug(f"ghex: {g.hex()}")
+		logging.debug(f"salt: {salt.hex()}")
+		logging.debug(f"server_pkey: {server_pkey.hex()}")
 		
 		client_iv = os.urandom(0x10)
 		client_pkey, client_proof, client_computed_key_buf = srp_client.process_challenge(
@@ -211,10 +201,10 @@ class ACPClient(object):
 		)
 		
 		dic = OrderedDict([
-			(u"iv", client_iv),
-			(u"publicKey", client_pkey),
-			(u"state", 3),
-			(u"response", client_proof),
+			("iv", client_iv),
+			("publicKey", client_pkey),
+			("state", 3),
+			("response", client_proof),
 		])
 		payload = CFLBinaryPListComposer.compose(dic)
 		raw_message = ACPMessage.compose_auth_command(4, payload)
@@ -225,14 +215,14 @@ class ACPClient(object):
 		
 		self._raise_for_reply_error(operation, reply_header)
 		
-		logging.debug("recv_size: {0}".format(reply_header.body_size))
+		logging.debug(f"recv_size: {reply_header.body_size}")
 		raw_message = self.recv(reply_header.body_size)
-		logging.debug("raw_message: {0!r}".format(raw_message))
+		logging.debug(f"raw_message: {raw_message!r}")
 		params2 = CFLBinaryPListParser.parse(raw_message)
 		logging.debug(params2)
 	
-		server_proof = self._require_auth_field(operation, params2, u"response")
-		server_iv = self._require_auth_field(operation, params2, u"iv")
+		server_proof = self._require_auth_field(operation, params2, "response")
+		server_iv = self._require_auth_field(operation, params2, "iv")
 		
 		# verify server response
 		srp_client.verify_server_proof(server_proof)
@@ -244,7 +234,7 @@ class ACPClient(object):
 			return params[field]
 		except KeyError as e:
 			raise ACPClientError(
-				"{0} reply missing required field \"{1}\"".format(operation, field)
+				f"{operation} reply missing required field \"{field}\""
 			) from e
 
 

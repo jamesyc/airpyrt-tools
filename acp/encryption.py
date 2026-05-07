@@ -2,12 +2,11 @@ from Cryptodome.Cipher import AES
 from Cryptodome.Protocol import KDF
 from Cryptodome.Util import Counter
 
-
 PBKDF_salt0 = bytes.fromhex("F072FA3F66B410A135FAE8E6D1D43D5F")
 PBKDF_salt1 = bytes.fromhex("BD0682C9FE79325BC73655F4174B996C")
 
 
-class _ACPEncryptionContext(object):
+class _ACPEncryptionContext:
 	def __init__(self, key, iv):
 		self.key = key
 		self.iv = iv
@@ -16,7 +15,7 @@ class _ACPEncryptionContext(object):
 		self.cipher = AES.new(key, AES.MODE_CTR, counter=self.ctr)
 
 
-class ACPEncryption(object):
+class ACPEncryption:
 	def __init__(self, key, client_iv, server_iv):
 		self._client_context = self._init_client_context(key, client_iv)
 		self._server_context = self._init_server_context(key, server_iv)

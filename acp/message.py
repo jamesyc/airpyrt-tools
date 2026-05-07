@@ -53,7 +53,7 @@ def _generate_acp_header_key(password):
 	return bytes(enc_pw_buf)
 
 
-class ACPMessage(object):
+class ACPMessage:
 	"""ACP message composition and parsing"""
 	
 	#XXX: struct is stupid about unpacking unsigned ints > 0x7fffffff, so treat everything as signed and
@@ -87,14 +87,14 @@ class ACPMessage(object):
 	
 	
 	def __str__(self):
-		s =  "ACPMessage:    {0!r}\n".format(self)
-		s += "body_checksum: {0:#x}\n".format(self.body_checksum)
-		s += "body_size:     {0:#x}\n".format(self.body_size)
-		s += "flags:         {0:#x}\n".format(self.flags)
-		s += "unused:        {0:#x}\n".format(self.unused)
-		s += "command:       {0:#x}\n".format(self.command)
-		s += "error_code:    {0:#x}\n".format(self.error_code)
-		s += "key:           {0!r}".format(self.key)
+		s =  f"ACPMessage:    {self!r}\n"
+		s += f"body_checksum: {self.body_checksum:#x}\n"
+		s += f"body_size:     {self.body_size:#x}\n"
+		s += f"flags:         {self.flags:#x}\n"
+		s += f"unused:        {self.unused:#x}\n"
+		s += f"command:       {self.command:#x}\n"
+		s += f"error_code:    {self.error_code:#x}\n"
+		s += f"key:           {self.key!r}"
 		return s
 	
 	
@@ -108,22 +108,22 @@ class ACPMessage(object):
 			raise ACPMessageError("expected str or bytes")
 		# bail early if there is not enough data
 		if len(data) < cls.header_size:
-			raise ACPMessageError("need to pass at least {0} bytes".format(cls.header_size))
+			raise ACPMessageError(f"need to pass at least {cls.header_size} bytes")
 		header_data = data[:cls.header_size]
 		# make sure there's data beyond the header before we try to access it
 		body_data = data[cls.header_size:] if len(data) > cls.header_size else None
 		
 		(magic, version, header_checksum, body_checksum, body_size, flags, unused, command, error_code, key) = cls._header_format.unpack(header_data)
 		logging.debug("ACP message header fields, parsed not validated")
-		logging.debug("magic           {0!r}".format(magic))
-		logging.debug("header_checksum {0:#x}".format(header_checksum))
-		logging.debug("body_checksum   {0:#x}".format(body_checksum))
-		logging.debug("body_size       {0:#x}".format(body_size))
-		logging.debug("flags           {0:#x}".format(flags))
-		logging.debug("unused          {0:#x}".format(unused))
-		logging.debug("command         {0:#x}".format(command))
-		logging.debug("error_code      {0:#x}".format(error_code))
-		logging.debug("key             {0!r}".format(key))
+		logging.debug(f"magic           {magic!r}")
+		logging.debug(f"header_checksum {header_checksum:#x}")
+		logging.debug(f"body_checksum   {body_checksum:#x}")
+		logging.debug(f"body_size       {body_size:#x}")
+		logging.debug(f"flags           {flags:#x}")
+		logging.debug(f"unused          {unused:#x}")
+		logging.debug(f"command         {command:#x}")
+		logging.debug(f"error_code      {error_code:#x}")
+		logging.debug(f"key             {key!r}")
 		
 		if magic != cls._header_magic:
 			raise ACPMessageError("bad header magic")

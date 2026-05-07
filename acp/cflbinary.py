@@ -1,8 +1,7 @@
 import logging
 import struct
 from collections import OrderedDict
-from math  import log
-
+from math import log
 
 _header_magic = b"CFB0"
 _footer_magic = b"END!"
@@ -27,7 +26,7 @@ class CFLBinaryPListParseError(Exception):
 	pass
 
 
-class CFLBinaryPListComposer(object):
+class CFLBinaryPListComposer:
 	"""Write cflbinary format property list"""
 	
 	@classmethod
@@ -62,7 +61,7 @@ class CFLBinaryPListComposer(object):
 				try:
 					buf = struct.pack(fmt, obj)
 				except struct.error:
-					logging.debug("XXX: skipping {0}".format(fmt))
+					logging.debug(f"XXX: skipping {fmt}")
 					pass
 				else:
 					break
@@ -80,7 +79,7 @@ class CFLBinaryPListComposer(object):
 				try:
 					buf = struct.pack(fmt, obj)
 				except struct.error:
-					logging.debug("XXX: skipping {0}".format(fmt))
+					logging.debug(f"XXX: skipping {fmt}")
 					pass
 				else:
 					break
@@ -123,7 +122,7 @@ class CFLBinaryPListComposer(object):
 			data += b"\x00"
 		
 		else:
-			raise CFLBinaryPListComposeError("unsupported Python built-in type: {0}".format(type(obj)))
+			raise CFLBinaryPListComposeError(f"unsupported Python built-in type: {type(obj)}")
 		
 		return bytes(data)
 	
@@ -144,7 +143,7 @@ class CFLBinaryPListComposer(object):
 		return bytes(data)
 
 
-class CFLBinaryPListParser(object):
+class CFLBinaryPListParser:
 	"""Read cflbinary format property list"""
 	
 	@classmethod
@@ -268,7 +267,7 @@ class CFLBinaryPListParser(object):
 			elif object_info == 0x09: # bool, true
 				return True, data
 			else:
-				raise CFLBinaryPListParseError("unsupported object info value for object type 0x00: {0:#x}".format(object_info))
+				raise CFLBinaryPListParseError(f"unsupported object info value for object type 0x00: {object_info:#x}")
 		
 		elif object_type == 0x10:     # int, big-endian
 			return cls._unpack_int(object_info, data)
@@ -345,7 +344,7 @@ class CFLBinaryPListParser(object):
 			return obj, data
 		
 		else:
-			raise CFLBinaryPListParseError("unsupported object type: {0:#x}".format(object_type))
+			raise CFLBinaryPListParseError(f"unsupported object type: {object_type:#x}")
 	
 	@classmethod
 	def parse(cls, data):

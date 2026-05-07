@@ -5,7 +5,6 @@ import struct
 from .cflbinary import CFLBinaryPListParser
 from .exception import ACPPropertyError
 
-
 _acp_properties = [
 	# Uncomment and fill out relevant fields to add support for a property
 	# Properties must be in the following format:
@@ -580,7 +579,7 @@ def _get_validation_rule(validation):
 	if not validation:
 		return None
 	if validation not in _validation_rules:
-		raise AssertionError("unsupported property validation rule: {0}".format(validation))
+		raise AssertionError(f"unsupported property validation rule: {validation}")
 	return _validation_rules[validation]
 
 
@@ -588,9 +587,9 @@ def _generate_acp_property_dict():
 	props = {}
 	for (name, type, description, validation) in _acp_properties:
 		# basic validation of tuples
-		assert len(name) == 4, "bad name in _acp_properties list: {0}".format(name)
-		assert type in ["str", "dec", "hex", "log", "mac", "cfb", "bin"], "bad type in _acp_properties list for name: {0}".format(name)
-		assert description, "missing description in _acp_properties list for name: {0}".format(name)
+		assert len(name) == 4, f"bad name in _acp_properties list: {name}"
+		assert type in ["str", "dec", "hex", "log", "mac", "cfb", "bin"], f"bad type in _acp_properties list for name: {name}"
+		assert description, f"missing description in _acp_properties list for name: {name}"
 		props[name] = dict(
 			type=type,
 			description=description,
@@ -604,7 +603,7 @@ class ACPPropertyInitValueError(ACPPropertyError):
 	pass
 
 
-class ACPProperty(object):
+class ACPProperty:
 	_acpprop = _generate_acp_property_dict()
 	
 	_element_header_format = struct.Struct("!4s2I")
@@ -641,25 +640,25 @@ class ACPProperty(object):
 			name = self._name_from_wire(name)
 		
 		if name and name not in self.get_supported_property_names():
-			raise ACPPropertyError("invalid property name passed to initializer: {0}".format(name))
+			raise ACPPropertyError(f"invalid property name passed to initializer: {name}")
 		
 		if value is not None:
 			# accept value as packed binary string or Python type
 			prop_type = self.get_property_info_string(name, "type")
-			_init_handler_name = "_init_{0}".format(prop_type)
-			assert hasattr(self, _init_handler_name), "missing init handler for \"{0}\" property type".format(prop_type)
+			_init_handler_name = f"_init_{prop_type}"
+			assert hasattr(self, _init_handler_name), f"missing init handler for \"{prop_type}\" property type"
 			_init_handler = getattr(self, _init_handler_name)
 			
-			logging.debug("old value: {0!r} type: {1}".format(value, type(value)))
+			logging.debug(f"old value: {value!r} type: {type(value)}")
 			try:
 				value = _init_handler(value)
 			except ACPPropertyInitValueError as e:
-				raise ACPPropertyError("{0!s} provided for \"{1}\" property type: {2!r}".format(e, prop_type, value)) from e
-			logging.debug("new value: {0!r} type: {1}".format(value, type(value)))
+				raise ACPPropertyError(f"{e!s} provided for \"{prop_type}\" property type: {value!r}") from e
+			logging.debug(f"new value: {value!r} type: {type(value)}")
 			
 			validator = self.get_property_validator(name)
 			if validator and not validator(value):
-				raise ACPPropertyError("invalid value passed to initializer for property \"{0}\": {1}".format(name, repr(value)))
+				raise ACPPropertyError(f"invalid value passed to initializer for property \"{name}\": {repr(value)}")
 		
 		self.name = name
 		self.value = value
@@ -747,8 +746,8 @@ class ACPProperty(object):
 			return ""
 		
 		prop_type = self.get_property_info_string(self.name, "type")
-		_format_handler_name = "_format_{0}".format(prop_type)
-		assert hasattr(self, _format_handler_name), "missing format handler for \"{0}\" property type".format(prop_type)
+		_format_handler_name = f"_format_{prop_type}"
+		assert hasattr(self, _format_handler_name), f"missing format handler for \"{prop_type}\" property type"
 		return getattr(self, _format_handler_name)(self.value)
 	
 	def _format_dec(self, value):
@@ -760,7 +759,7 @@ class ACPProperty(object):
 	def _format_mac(self, value):
 		mac_bytes = []
 		for i in range(6):
-			mac_bytes.append("{0:02x}".format(value[i]))
+			mac_bytes.append(f"{value[i]:02x}")
 		return "{0}:{1}:{2}:{3}:{4}:{5}".format(*mac_bytes)
 	
 	def _format_bin(self, value):
@@ -793,11 +792,11 @@ class ACPProperty(object):
 		if prop_name is None:
 			return None
 		if prop_name not in cls._acpprop:
-			logging.error("property \"{0}\" not supported".format(prop_name))
+			logging.error(f"property \"{prop_name}\" not supported")
 			return None
 		prop_info = cls._acpprop[prop_name]
 		if key not in prop_info:
-			logging.error("invalid property info key \"{0}\"".format(key))
+			logging.error(f"invalid property info key \"{key}\"")
 			return None
 		return prop_info[key]
 

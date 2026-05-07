@@ -36,14 +36,14 @@ def _derive_key(model):
 		return None
 	key = bytes.fromhex(_basebinary_keys[model])
 	derived_key = bytes(key[i] ^ (i + 0x19) for i in range(len(key)))
-	logging.debug("derived key {0}".format(derived_key.hex()))
+	logging.debug(f"derived key {derived_key.hex()}")
 	return derived_key
 
 
 class BasebinaryError(Exception):
 	pass
 
-class Basebinary(object):
+class Basebinary:
 	_header_magic = b"APPLE-FIRMWARE\x00"
 	#XXX: do we need to fix shitty Python struct member signdness things here too?
 	_header_format = struct.Struct(">15sB2I4BI")
@@ -69,9 +69,9 @@ class Basebinary(object):
 		
 		#XXX: why is Python so shitty about this comparison <.<
 		checksum = cast_u32(zlib.adler32(header_data+inner_data))
-		logging.debug("stored checksum     {0:#x}".format(stored_checksum))
-		logging.debug("calculated checksum {0:#x}".format(checksum))
-		logging.debug("data length         {0:#x}".format(len(header_data+inner_data)))
+		logging.debug(f"stored checksum     {stored_checksum:#x}")
+		logging.debug(f"calculated checksum {checksum:#x}")
+		logging.debug(f"data length         {len(header_data+inner_data):#x}")
 		if stored_checksum != checksum:
 			raise BasebinaryError("bad checksum")
 			
@@ -108,7 +108,7 @@ class Basebinary(object):
 		iv = cls._header_magic + bytes([byte_0x0F])
 		key = _derive_key(model)
 		if key is None:
-			raise BasebinaryError("key missing for model {0}".format(model))
+			raise BasebinaryError(f"key missing for model {model}")
 		
 		decrypted_chunks = []
 		remaining_length = len(data)
