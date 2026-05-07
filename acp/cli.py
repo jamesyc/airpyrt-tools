@@ -359,21 +359,27 @@ def _run_local(handler, arg):
     handler(arg)
 
 
+def _remote_requires_admin_password(mode, auth_mode):
+    return auth_mode == AUTH_SRP or mode == REMOTE_ADMIN
+
+
+def _validate_remote_credentials(mode, target, password, auth_mode):
+    if mode not in (REMOTE_NOAUTH, REMOTE_ADMIN):
+        raise ACPCommandLineError(f"unknown command type: {mode}")
+
+    if _remote_requires_admin_password(mode, auth_mode):
+        if target is None or password is None:
+            raise ACPCommandLineError("must specify a target and administrator password")
+    elif target is None:
+        raise ACPCommandLineError("must specify a target")
+
+
 def _run_remote(handler, arg, mode, target, password, auth_mode, client_factory):
-    if auth_mode == AUTH_SRP:
-        if target is None or password is None:
-            raise ACPCommandLineError("must specify a target and administrator password")
-        client = client_factory(target, password)
-    elif mode == REMOTE_NOAUTH:
-        if target is None:
-            raise ACPCommandLineError("must specify a target")
-        client = client_factory(target)
-    elif auth_mode == AUTH_LEGACY and mode == REMOTE_ADMIN:
-        if target is None or password is None:
-            raise ACPCommandLineError("must specify a target and administrator password")
+    _validate_remote_credentials(mode, target, password, auth_mode)
+    if _remote_requires_admin_password(mode, auth_mode):
         client = client_factory(target, password)
     else:
-        raise ACPCommandLineError(f"unknown command type: {mode}")
+        client = client_factory(target)
 
     try:
         client.connect()

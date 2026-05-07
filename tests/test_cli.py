@@ -36,6 +36,9 @@ class FakeClient:
     def authenticate_srp(self):
         self.srp_authenticated = True
 
+    def get_features(self):
+        return {"feature": True}
+
 
 class FakeClientFactory:
     def __init__(self, *, fail_get=False):
@@ -141,6 +144,24 @@ def test_run_srp_auth_mode_requires_admin_password():
 
     assert status == 1
     assert "must specify a target and administrator password" in stderr.getvalue()
+
+
+def test_run_legacy_noauth_command_requires_only_target():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--do-feat-command", "-t", "router"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 0
+    assert factory.clients[0].target == "router"
+    assert factory.clients[0].password == ""
+    assert stdout.getvalue() == "{'feature': True}\n"
 
 
 def test_run_closes_remote_client_when_handler_raises():
