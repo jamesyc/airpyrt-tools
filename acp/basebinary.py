@@ -36,14 +36,14 @@ def _derive_key(model):
 		return None
 	key = bytes.fromhex(_basebinary_keys[model])
 	derived_key = bytes(key[i] ^ (i + 0x19) for i in range(len(key)))
-	logging.debug("derived key {0}".format(derived_key.hex()))
+	logging.debug(f"derived key {derived_key.hex()}")
 	return derived_key
 
 
 class BasebinaryError(Exception):
 	pass
 
-class Basebinary(object):
+class Basebinary:
 	_header_magic = b"APPLE-FIRMWARE\x00"
 	#XXX: do we need to fix shitty Python struct member signdness things here too?
 	_header_format = struct.Struct(">15sB2I4BI")
@@ -62,16 +62,25 @@ class Basebinary(object):
 		#XXX: and here??
 		stored_checksum, = struct.unpack(">I", data[-4:])
 		
-		(byte_0x0F, model, version, byte_0x18, byte_0x19, byte_0x1A, flags, unk_0x1C) = cls.parse_header(header_data)
+		(
+			byte_0x0F,
+			model,
+			version,
+			byte_0x18,
+			byte_0x19,
+			byte_0x1A,
+			flags,
+			unk_0x1C,
+		) = cls.parse_header(header_data)
 		
 		if flags & 2:
 			inner_data = cls.decrypt(inner_data, model, byte_0x0F)
 		
 		#XXX: why is Python so shitty about this comparison <.<
 		checksum = cast_u32(zlib.adler32(header_data+inner_data))
-		logging.debug("stored checksum     {0:#x}".format(stored_checksum))
-		logging.debug("calculated checksum {0:#x}".format(checksum))
-		logging.debug("data length         {0:#x}".format(len(header_data+inner_data)))
+		logging.debug(f"stored checksum     {stored_checksum:#x}")
+		logging.debug(f"calculated checksum {checksum:#x}")
+		logging.debug(f"data length         {len(header_data+inner_data):#x}")
 		if stored_checksum != checksum:
 			raise BasebinaryError("bad checksum")
 			
@@ -87,7 +96,17 @@ class Basebinary(object):
 	@classmethod
 	def parse_header(cls, data):
 		try:
-			magic, byte_0x0F, model, version, byte_0x18, byte_0x19, byte_0x1A, flags, unk_0x1C = cls._header_format.unpack(data)
+			(
+				magic,
+				byte_0x0F,
+				model,
+				version,
+				byte_0x18,
+				byte_0x19,
+				byte_0x1A,
+				flags,
+				unk_0x1C,
+			) = cls._header_format.unpack(data)
 		except struct.error as e:
 			raise BasebinaryError("failed to parse firmware header") from e
 		
@@ -98,7 +117,17 @@ class Basebinary(object):
 	
 	
 	@classmethod
-	def compose_header(cls, byte_0x0F, model, version, byte_0x18, byte_0x19, byte_0x1A, flags, unk_0x1C):
+	def compose_header(
+		cls,
+		byte_0x0F,
+		model,
+		version,
+		byte_0x18,
+		byte_0x19,
+		byte_0x1A,
+		flags,
+		unk_0x1C,
+	):
 		#TODO
 		pass
 	
@@ -108,14 +137,16 @@ class Basebinary(object):
 		iv = cls._header_magic + bytes([byte_0x0F])
 		key = _derive_key(model)
 		if key is None:
-			raise BasebinaryError("key missing for model {0}".format(model))
+			raise BasebinaryError(f"key missing for model {model}")
 		
 		decrypted_chunks = []
 		remaining_length = len(data)
 		chunk_length = 0x8000
 		while remaining_length:
 			if remaining_length > chunk_length:
-				decrypted_chunks.append(cls.decrypt_chunk(data[-remaining_length:-(remaining_length-chunk_length)], key, iv))
+				start = -remaining_length
+				end = -(remaining_length - chunk_length)
+				decrypted_chunks.append(cls.decrypt_chunk(data[start:end], key, iv))
 				remaining_length -= chunk_length
 			else:
 				decrypted_chunks.append(cls.decrypt_chunk(data[-remaining_length:], key, iv))

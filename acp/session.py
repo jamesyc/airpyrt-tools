@@ -5,10 +5,9 @@ import time
 from .encryption import ACPEncryption
 from .exception import ACPSessionError
 
-
 ACP_SERVER_PORT = 5009
 
-class _ACPSession(object):
+class _ACPSession:
 	def __init__(self, target, password):
 		#XXX: how should we make this abstract enough to cover client and server?
 		self.target = target
@@ -28,7 +27,7 @@ class _ACPSession(object):
 	def connect(self, port=ACP_SERVER_PORT):
 		self.port = port
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		logging.info("connecting to host {0}:{1}".format(self.target, self.port))
+		logging.info(f"connecting to host {self.target}:{self.port}")
 		self.sock.connect((self.target, self.port))
 	
 	
@@ -60,7 +59,7 @@ class _ACPSession(object):
 			data = self.sock.recv(size - recvd_size)
 			if not data:
 				raise ACPSessionError(
-					"connection closed before receiving {0} bytes".format(size)
+					f"connection closed before receiving {size} bytes"
 				)
 			recvd_chunks.append(data)
 			recvd_size += len(data)
@@ -80,7 +79,7 @@ class _ACPSession(object):
 					break
 				if time.monotonic() >= deadline:
 					raise ACPSessionError(
-						"timed out before receiving {0} bytes".format(size)
+						f"timed out before receiving {size} bytes"
 					)
 
 				try:
@@ -92,7 +91,7 @@ class _ACPSession(object):
 
 				if not data:
 					raise ACPSessionError(
-						"connection closed before receiving {0} bytes".format(size)
+						f"connection closed before receiving {size} bytes"
 					)
 				recvd_chunks.append(data)
 				recvd_size += len(data)
