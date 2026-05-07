@@ -159,17 +159,15 @@ available/readable.
 - add IP address type for properties, make sure it supports IPv4 and IPv6
 - specify RO/WO/RW attribute for properties
 - exception handling:
-  - invalid struct fields aren't handled well in many cases
-  - finish adding custom exception classes and make sure we're using them
-- logging (mostly done, still looks horrible) with verbosity controls
+  - audit malformed struct/protocol field coverage
+  - improve error messages for unsupported device replies
+- improve logging structure and message consistency
 - review and update docstrings
-- broaden SRP/protocol v2 device coverage
-- handle encrypted property elements
+- broaden SRP/protocol v2 device coverage beyond the current Time Capsule tests
 - basebinary repacking/reencryption
 - basebinary rootfs mounting
 - threaded server
 - handle protocol v1 (for old firmwares/devices)
 - bonjour announcement/discovery
-- option to specify no authentication for commands that support it
 - ACPMonitorSession support
 - ACPRPC support
