@@ -1,10 +1,14 @@
 import hashlib
 import hmac
+import logging
 import secrets
 
 from .exception import ACPClientError
+from .srp_groups import validate_srp_group
 
 RFC2945_KEY_LEN = 40
+
+logger = logging.getLogger(__name__)
 
 
 def _as_bytes(value):
@@ -142,6 +146,16 @@ class SRP6aClient:
             raise ACPClientError("SRP generator must be greater than one and less than N")
         if server_public_key_int == 0 or server_public_key_int >= n:
             raise ACPClientError("SRP server public key must not be zero modulo N")
+
+        group_validation = validate_srp_group(modulus_bytes, g)
+        if group_validation.known_name is None:
+            logger.warning(
+                "unknown SRP group from device: %s-bit N, g=%s, fingerprint=%s; "
+                "proceeding because group passed probable safe-prime validation",
+                group_validation.bits,
+                group_validation.generator,
+                group_validation.fingerprint,
+            )
 
         modulus_size = len(modulus_bytes)
         private_key = self._private_key(n)
