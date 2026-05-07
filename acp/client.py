@@ -55,11 +55,20 @@ class ACPClient:
 			(error_code, ) = struct.unpack(">I", prop_data)
 		except struct.error as e:
 			raise ACPClientError(
-				f"{operation} returned a malformed property error for \"{name}\""
+				f"{operation} returned a malformed property error for {name!r}"
 			) from e
 		raise ACPClientError(
-			f"error {operation} for property \"{name}\": {error_code:#x}"
+			f"error {operation} for property {name!r}: {error_code:#x}"
 		)
+
+
+	def _warn_for_unknown_property_flags(self, operation, name, flags):
+		unknown_flags = ACPProperty.unsupported_element_flags(flags)
+		if unknown_flags:
+			logging.warning(
+				f"{operation} returned unsupported property element flags for "
+				f"{name!r}: {flags:#x} (unknown bits {unknown_flags:#x})"
+			)
 
 
 	def get_properties(self, prop_names=None):
@@ -88,8 +97,9 @@ class ACPClient:
 			
 			prop_data = self.recv(size)
 			logging.debug(f"prop_data {prop_data!r}")
-			
-			if flags & 1:
+
+			self._warn_for_unknown_property_flags("get_properties", name, flags)
+			if ACPProperty.element_has_error(flags):
 				try:
 					self._unpack_property_error("requesting value", name, prop_data)
 				except ACPClientError as e:
@@ -133,8 +143,9 @@ class ACPClient:
 		
 		prop_data = self.recv(size)
 		logging.debug(f"prop_data {prop_data!r}")
-		
-		if flags & 1:
+
+		self._warn_for_unknown_property_flags("set_properties", name, flags)
+		if ACPProperty.element_has_error(flags):
 			self._unpack_property_error("setting value", name, prop_data)
 			
 		prop = ACPProperty(name, prop_data)

@@ -17,6 +17,8 @@ class FakeACPServer:
         *,
         get_props=None,
         get_prop_errors=None,
+        get_raw_elements=None,
+        set_reply_element=None,
         error_code=0,
         auth_challenge=None,
         auth_response=b"server-proof",
@@ -27,6 +29,8 @@ class FakeACPServer:
     ):
         self.get_props = get_props or []
         self.get_prop_errors = get_prop_errors or []
+        self.get_raw_elements = get_raw_elements or []
+        self.set_reply_element = set_reply_element
         self.error_code = error_code
         self.auth_challenge = auth_challenge or OrderedDict(
             [
@@ -53,13 +57,21 @@ class FakeACPServer:
                 for name, error_code in self.get_prop_errors:
                     reply += ACPProperty.compose_raw_element_header(name, 1, 4)
                     reply += struct.pack(">I", error_code)
+                for name, flags, value in self.get_raw_elements:
+                    reply += ACPProperty.compose_raw_element_header(name, flags, len(value))
+                    reply += value
                 for prop in self.get_props:
                     reply += ACPProperty.compose_raw_element(0, prop)
                 reply += ACPProperty.compose_raw_element(0, ACPProperty())
         elif request.command == 0x15:
             reply = stream_header(0x15, self.error_code)
             if self.error_code == 0:
-                reply += ACPProperty.compose_raw_element(0, ACPProperty())
+                if self.set_reply_element is None:
+                    reply += ACPProperty.compose_raw_element(0, ACPProperty())
+                else:
+                    name, flags, value = self.set_reply_element
+                    reply += ACPProperty.compose_raw_element_header(name, flags, len(value))
+                    reply += value
         elif request.command == 0x1A:
             auth_request = CFLBinaryPListParser.parse(request.body)
             self.auth_requests.append(auth_request)
@@ -228,7 +240,29 @@ def test_get_properties_logs_property_error_and_continues(caplog):
 
     assert [prop.name for prop in props] == ["syUT"]
     assert props[0].value == 42
-    assert "error requesting value for property \"syNm\": 0x5678" in caplog.text
+    assert "error requesting value for property 'syNm': 0x5678" in caplog.text
+
+
+def test_get_properties_warns_and_parses_unknown_non_error_property_flags(caplog):
+    server = FakeACPServer(get_raw_elements=[("syNm", 0x2, b"router")])
+    client = client_with_fake_server(server)
+
+    with caplog.at_level(logging.WARNING):
+        props = client.get_properties(["syNm"])
+
+    assert props[0].name == "syNm"
+    assert props[0].value == "router"
+    assert "unsupported property element flags for 'syNm': 0x2" in caplog.text
+
+
+def test_set_properties_warns_and_continues_for_unknown_non_error_property_flags(caplog):
+    server = FakeACPServer(set_reply_element=("syNm", 0x2, b"router"))
+    client = client_with_fake_server(server)
+
+    with caplog.at_level(logging.WARNING):
+        client.set_properties({"syNm": ACPProperty("syNm", "router")})
+
+    assert "unsupported property element flags for 'syNm': 0x2" in caplog.text
 
 
 def test_get_properties_raises_session_error_for_short_server_reply():
