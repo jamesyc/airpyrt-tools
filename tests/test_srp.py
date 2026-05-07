@@ -3,7 +3,7 @@ import hashlib
 import pytest
 
 from acp.exception import ACPClientError
-from acp.srp import SRP6aClient
+from acp.srp import RFC2945_KEY_LEN, SRP6aClient
 
 
 def _unhex(value):
@@ -94,7 +94,7 @@ def test_srp6a_matches_rfc5054_public_key_and_premaster_secret(assert_hex):
     assert_hex(client.premaster_secret, RFC5054_PREMASTER_SECRET)
     assert_hex(session_key, STANFORD_SRP_SESSION_KEY)
     assert len(proof) == 20
-    assert len(session_key) == 40
+    assert len(session_key) == RFC2945_KEY_LEN
 
 
 def test_srp6a_pads_client_public_key_to_modulus_size():
@@ -127,8 +127,11 @@ def test_srp6a_pads_premaster_secret_before_session_key_derivation():
 
     assert len(client.premaster_secret) == len(modulus)
     assert client.premaster_secret.startswith(b"\x00")
-    assert session_key == _mgf1_sha1(client.premaster_secret, 40)
-    assert session_key != _mgf1_sha1(client.premaster_secret.lstrip(b"\x00"), 40)
+    assert session_key == _mgf1_sha1(client.premaster_secret, RFC2945_KEY_LEN)
+    assert session_key != _mgf1_sha1(
+        client.premaster_secret.lstrip(b"\x00"),
+        RFC2945_KEY_LEN,
+    )
 
 
 def test_srp6a_verifies_matching_server_proof():

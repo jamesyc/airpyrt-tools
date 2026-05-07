@@ -4,6 +4,8 @@ import secrets
 
 from .exception import ACPClientError
 
+RFC2945_KEY_LEN = 40
+
 
 def _as_bytes(value):
     if isinstance(value, bytes):
@@ -69,7 +71,6 @@ def _calculate_u(client_public_key, server_public_key, modulus_size):
 
 
 def _mgf1_sha1(seed, length):
-    # Stanford-derived SRP6a backends use RFC2945_KEY_LEN bytes here.
     output = bytearray()
     counter = 0
     while len(output) < length:
@@ -165,7 +166,7 @@ class SRP6aClient:
         exponent = private_key + scrambling_parameter * x
         premaster_secret_int = pow(base, exponent, n)
         premaster_secret = _pad_int(premaster_secret_int, modulus_size)
-        session_key = _mgf1_sha1(premaster_secret, 40)
+        session_key = _mgf1_sha1(premaster_secret, RFC2945_KEY_LEN)
 
         client_public_key = _pad_int(client_public_key_int, modulus_size)
         server_public_key = _pad_int(server_public_key_int, modulus_size)
