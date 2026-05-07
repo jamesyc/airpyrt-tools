@@ -38,7 +38,7 @@ jobs:
 
       - name: Lint cleaned Python surfaces
         if: matrix.python-version == '3.11'
-        run: python -m ruff check acp/cli.py setup.py tests
+        run: python -m ruff check acp/cli.py acp/srp.py setup.py tests
 
       - name: Build distributions
         if: matrix.python-version == '3.11'
