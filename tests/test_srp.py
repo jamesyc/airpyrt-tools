@@ -1,9 +1,11 @@
 import hashlib
+import logging
 
 import pytest
 
 from acp.exception import ACPClientError
 from acp.srp import RFC2945_KEY_LEN, SRP6aClient
+from acp.srp_groups import RFC5054_1536_N, srp_group_fingerprint, validate_srp_group
 
 
 def _unhex(value):
@@ -26,12 +28,21 @@ def _sha1_int(*parts):
     return int.from_bytes(digest.digest(), "big")
 
 
+def _int_to_bytes(value):
+    return value.to_bytes(max(1, (value.bit_length() + 7) // 8), "big")
+
+
+def _pad_int(value, length):
+    return value.to_bytes(length, "big")
+
+
 def _zero_base_server_public_key(username, password, modulus, generator, salt):
     n = int.from_bytes(modulus, "big")
     g = int.from_bytes(generator, "big")
+    modulus_size = len(modulus)
     password_hash = hashlib.sha1(username + b":" + password).digest()
     x = _sha1_int(salt, password_hash)
-    k = _sha1_int(modulus, generator)
+    k = _sha1_int(_pad_int(n, modulus_size), _pad_int(g, modulus_size))
     return (k * pow(g, x, n)) % n
 
 
@@ -100,6 +111,47 @@ def test_srp6a_matches_rfc5054_public_key_and_premaster_secret(assert_hex):
 def test_srp6a_type_errors_include_received_type():
     with pytest.raises(TypeError, match="expected str or bytes, got int"):
         SRP6aClient(123, "password123")
+
+
+def test_srp6a_known_rfc5054_group_does_not_warn(caplog):
+    client = SRP6aClient("alice", "password123", private_key=_unhex(RFC5054_A_SECRET))
+
+    with caplog.at_level(logging.WARNING, logger="acp.srp"):
+        client.process_challenge(
+            _unhex(RFC5054_1024_N),
+            b"\x02",
+            _unhex(RFC5054_SALT),
+            _unhex(RFC5054_B),
+        )
+
+    assert "unknown SRP group" not in caplog.text
+
+
+def test_srp6a_identifies_live_device_rfc5054_1536_group():
+    assert (
+        srp_group_fingerprint(RFC5054_1536_N)
+        == "72af4a20e501a893b7dc85f4efac51845ab21c102d1e73f7000ec662df7e2069"
+    )
+    assert validate_srp_group(RFC5054_1536_N, 2).known_name == "RFC 5054 1536-bit group"
+
+
+def test_srp6a_unknown_safe_prime_group_warns_and_proceeds(caplog):
+    client = SRP6aClient("alice", "password123", private_key=_unhex(RFC5054_A_SECRET))
+
+    with caplog.at_level(logging.WARNING, logger="acp.srp"):
+        public_key, proof, session_key = client.process_challenge(
+            _unhex(RFC5054_1024_N),
+            b"\x06",
+            _unhex(RFC5054_SALT),
+            _unhex(RFC5054_B),
+        )
+
+    assert len(public_key) == len(_unhex(RFC5054_1024_N))
+    assert len(proof) == 20
+    assert len(session_key) == RFC2945_KEY_LEN
+    assert "unknown SRP group from device" in caplog.text
+    assert "passed probable safe-prime validation" in caplog.text
+    assert "494b6a801b379f37c9ee25d5db7cd70ffcfe53d01b7c9e4470eaca46bda24b39" in caplog.text
 
 
 def test_srp6a_pads_client_public_key_to_modulus_size():
@@ -209,9 +261,9 @@ def test_srp6a_rejects_zero_modulo_server_public_key():
 
 
 def test_srp6a_rejects_zero_premaster_base():
-    modulus = b"\x17"
+    modulus = _unhex(RFC5054_1024_N)
     generator = b"\x02"
-    salt = b"salt"
+    salt = _unhex(RFC5054_SALT)
     server_public_key_int = _zero_base_server_public_key(
         b"alice",
         b"password123",
@@ -227,7 +279,7 @@ def test_srp6a_rejects_zero_premaster_base():
             modulus,
             generator,
             salt,
-            bytes([server_public_key_int]),
+            _pad_int(server_public_key_int, len(modulus)),
         )
 
 
@@ -236,6 +288,41 @@ def test_srp6a_rejects_generator_not_less_than_modulus():
 
     with pytest.raises(ACPClientError, match="generator"):
         client.process_challenge(b"\x17", b"\x17", b"salt", b"\x01")
+
+
+def test_srp6a_rejects_unknown_too_small_group():
+    client = SRP6aClient("alice", "password123", private_key=1)
+
+    with pytest.raises(ACPClientError, match="too small"):
+        client.process_challenge(b"\x17", b"\x02", b"salt", b"\x08")
+
+
+def test_srp6a_rejects_unknown_composite_modulus():
+    client = SRP6aClient("alice", "password123", private_key=1)
+    modulus = _int_to_bytes(int.from_bytes(_unhex(RFC5054_1024_N), "big") * 3)
+
+    with pytest.raises(ACPClientError, match="probable prime"):
+        client.process_challenge(modulus, b"\x02", b"salt", b"\x08")
+
+
+def test_srp6a_rejects_unknown_non_safe_prime_modulus():
+    client = SRP6aClient("alice", "password123", private_key=1)
+    modulus = _int_to_bytes((1 << 1279) - 1)
+
+    with pytest.raises(ACPClientError, match="safe prime"):
+        client.process_challenge(modulus, b"\x02", b"salt", b"\x08")
+
+
+def test_srp6a_rejects_unknown_safe_prime_group_with_invalid_generator():
+    client = SRP6aClient("alice", "password123", private_key=1)
+
+    with pytest.raises(ACPClientError, match="generator"):
+        client.process_challenge(
+            _unhex(RFC5054_1024_N),
+            b"\x03",
+            _unhex(RFC5054_SALT),
+            _unhex(RFC5054_B),
+        )
 
 
 def test_srp6a_rejects_non_positive_private_key():
