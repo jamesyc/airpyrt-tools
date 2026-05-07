@@ -36,9 +36,9 @@ jobs:
       - name: Compile package source
         run: python -m compileall -q acp
 
-      - name: Lint cleaned Python surfaces
+      - name: Lint package and tests
         if: matrix.python-version == '3.9'
-        run: python -m ruff check acp/cli.py acp/srp.py setup.py tests
+        run: python -m ruff check acp setup.py tests
 
       - name: Build distributions
         if: matrix.python-version == '3.9'

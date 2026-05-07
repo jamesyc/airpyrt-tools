@@ -124,7 +124,7 @@ debug logging while investigating failures.
 python -m pytest
 python -m coverage run -m pytest
 python -m coverage report
-python -m ruff check acp/cli.py acp/srp.py setup.py tests
+python -m ruff check acp setup.py tests
 python -m compileall -q acp
 python -m build
 python -m twine check dist/*
@@ -132,9 +132,7 @@ python -m pip install --force-reinstall dist/*.whl
 python -m pip check
 ```
 
-The current ruff target covers the package entrypoint, SRP backend, packaging
-shim, and tests. The older protocol modules still need a separate whole-package
-lint cleanup pass.
+The ruff target covers the package, packaging shim, and tests.
 
 
 ### Notes
