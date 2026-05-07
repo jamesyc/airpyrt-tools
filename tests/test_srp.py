@@ -97,6 +97,11 @@ def test_srp6a_matches_rfc5054_public_key_and_premaster_secret(assert_hex):
     assert len(session_key) == RFC2945_KEY_LEN
 
 
+def test_srp6a_type_errors_include_received_type():
+    with pytest.raises(TypeError, match="expected str or bytes, got int"):
+        SRP6aClient(123, "password123")
+
+
 def test_srp6a_pads_client_public_key_to_modulus_size():
     client = SRP6aClient("alice", "password123", private_key=1)
     modulus = _unhex(RFC5054_1024_N)

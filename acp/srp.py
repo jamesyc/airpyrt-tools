@@ -12,7 +12,7 @@ def _as_bytes(value):
         return value
     if isinstance(value, str):
         return value.encode("utf-8")
-    raise TypeError("expected str or bytes")
+    raise TypeError(f"expected str or bytes, got {type(value).__name__}")
 
 
 def _int_from_bytes(value):
@@ -146,7 +146,7 @@ class SRP6aClient:
         modulus_size = len(modulus_bytes)
         private_key = self._private_key(n)
         client_public_key_int = pow(g, private_key, n)
-        if client_public_key_int % n == 0:
+        if client_public_key_int == 0:
             raise ACPClientError("SRP client public key must not be zero modulo N")
 
         x = _calculate_x(self.username, self.password, salt)
