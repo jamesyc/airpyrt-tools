@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - name: Check out repository
@@ -37,21 +37,21 @@ jobs:
         run: python -m compileall -q acp
 
       - name: Lint cleaned Python surfaces
-        if: matrix.python-version == '3.11'
+        if: matrix.python-version == '3.9'
         run: python -m ruff check acp/cli.py acp/srp.py setup.py tests
 
       - name: Build distributions
-        if: matrix.python-version == '3.11'
+        if: matrix.python-version == '3.9'
         run: python -m build
 
       - name: Check distribution metadata
-        if: matrix.python-version == '3.11'
+        if: matrix.python-version == '3.9'
         run: python -m twine check dist/*
 
       - name: Install wheel
-        if: matrix.python-version == '3.11'
+        if: matrix.python-version == '3.9'
         run: python -m pip install --force-reinstall dist/*.whl
 
       - name: Check installed dependencies
-        if: matrix.python-version == '3.11'
+        if: matrix.python-version == '3.9'
         run: python -m pip check

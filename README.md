@@ -7,9 +7,12 @@ See LICENSE
 
 ### Requirements
 
-- Python 3.11 or newer
-- Tested on Python 3.11 through 3.14
+- Python 3.9 or newer
+- Tested on Python 3.9 through 3.14
 - pycryptodomex
+
+Python 3.9 support is for compatibility with older platforms. Python 3.9 is
+upstream end-of-life, so use Python 3.11 or newer when practical.
 
 
 ### Installation
