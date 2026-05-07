@@ -114,7 +114,7 @@ class ACPClient:
 		if props_dict is None:
 			props_dict = {}
 		payload = b""
-		for _name, prop in props_dict.items():
+		for prop in props_dict.values():
 			logging.debug(f"prop: {prop!r}")
 			payload += ACPProperty.compose_raw_element(0, prop)
 		request = ACPMessage.compose_setprop_command(0, self.password, payload)

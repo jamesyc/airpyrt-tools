@@ -768,10 +768,7 @@ class ACPProperty:
 		return hex(value)
 	
 	def _format_mac(self, value):
-		mac_bytes = []
-		for i in range(6):
-			mac_bytes.append(f"{value[i]:02x}")
-		return ":".join(mac_bytes)
+		return ":".join(f"{byte:02x}" for byte in value[:6])
 	
 	def _format_bin(self, value):
 		return value.hex()
@@ -780,11 +777,11 @@ class ACPProperty:
 		return pprint.pformat(CFLBinaryPListParser.parse(value))
 	
 	def _format_log(self, value):
-		s = ""
-		for line in value.strip(b"\x00").split(b"\x00"):
-			decoded_line = line.decode("utf-8", errors="replace")
-			s += f"{decoded_line}\n"
-		return s
+		lines = (
+			line.decode("utf-8", errors="replace")
+			for line in value.strip(b"\x00").split(b"\x00")
+		)
+		return "".join(f"{line}\n" for line in lines)
 	
 	def _format_str(self, value):
 		return value
