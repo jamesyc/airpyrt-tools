@@ -7,7 +7,7 @@ See LICENSE
 
 ### Requirements
 
-- Python 3.9 or newer
+- Python 3.9 or newer, Linux or Mac. Windows is untested.
 - Tested on Python 3.9 through 3.14
 - pycryptodomex
 
