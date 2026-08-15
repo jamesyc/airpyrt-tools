@@ -7,29 +7,24 @@ from Cryptodome.Cipher import AES
 #XXX: ugh...
 from .misc import cast_u32
 
-# hardcoded 128 bit values
-# 107: 52 49 C3 51 02 8B F1 FD 2B D1 84 9E 28 B2 3F 24
-# 108: BB 7D EB 09 70 D8 EE 2E 00 FA 46 CB 1C 3C 09 8E
-# 115: 10 75 E8 06 F4 77 0C D4 76 3B D2 85 A6 4E 91 74
-# 120: 68 8C DD 3B 1B 6B DD A2 07 B6 CE C2 73 52 92 D2
-
+# Hardcoded 128-bit values. The model IDs and additional keys below are from
+# TimeCapsuleSMB's supported AirPort device and basebinary key registries:
+# https://github.com/jamesyc/TimeCapsuleSMB
 _basebinary_keys = {
-	#3   : "",
-	#102 : "",
-	#104 : "",
-	#105 : "",
-	#106 : "",
-	107 : "5249c351028bf1fd2bd1849e28b23f24",
-	108 : "bb7deb0970d8ee2e00fa46cb1c3c098e",
-	#109 : "",
-	#113 : "",
-	#114 : "",
-	115 : "1075e806f4770cd4763bd285a64e9174",
-	#116 : "",
-	#117 : "",
-	#119 : "",
-	120 : "688cdd3b1b6bdda207b6cec2735292d2",
-	}
+	104: "ec7abae211819b1349880d2035a24d78",
+	105: "87f52f57c573e87499b6d69c8e4bcb8b",
+	106: "513c1ca5bf035127335f7c2596aa20aa",
+	107: "5249c351028bf1fd2bd1849e28b23f24",
+	108: "bb7deb0970d8ee2e00fa46cb1c3c098e",
+	109: "cfb15a151a3998b983a5a48aaa859e80",
+	113: "c025fefa2320b0e985dfac106694db4a",
+	114: "a66e263e7b751242ac7fa0c90951ed08",
+	115: "1075e806f4770cd4763bd285a64e9174",
+	116: "9d1259ee89f28a2ccfa64697adbb4193",
+	117: "74119d5182c7a317db0026e49efde79a",
+	119: "b19937ddcb78b3f151e4e0b48198e6a7",
+	120: "688cdd3b1b6bdda207b6cec2735292d2",
+}
 
 def _derive_key(model):
 	if model not in _basebinary_keys:
