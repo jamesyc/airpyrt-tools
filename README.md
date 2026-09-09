@@ -135,6 +135,42 @@ python -m pip check
 The ruff target covers the package, packaging shim, and tests.
 
 
+### Release
+
+Tagged pushes run `.github/workflows/release.yml`, which verifies the tag
+matches `project.version` in `pyproject.toml`, runs `python -m build` and
+`twine check`, and uploads `dist/*` (wheel + sdist) to the matching GitHub
+Release.
+
+To cut a release:
+
+```
+# 1. Bump the version
+#    pyproject.toml -> [project] version = "X.Y.Z"
+python -m pytest
+python -m build
+python -m twine check dist/*
+
+# 2. Commit, tag, and push
+git add pyproject.toml
+git commit -m "Bump to vX.Y.Z"
+git tag vX.Y.Z
+git push origin main vX.Y.Z
+
+# 3. Publish the release notes
+gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <notes.md>
+# The workflow attaches the built wheel + sdist automatically.
+```
+
+Manual fallback if the workflow did not attach assets:
+
+```
+python -m build
+python -m twine check dist/*
+gh release upload vX.Y.Z dist/* --clobber --repo jamesyc/airpyrt-tools
+```
+
+
 ### Notes
 
 **IMPORTANT**
