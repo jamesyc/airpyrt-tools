@@ -6,8 +6,30 @@ import pytest
 from helpers import make_basebinary_blob
 
 from acp import cli
+from acp.cflbinary import CFLBinaryPListComposer
 from acp.exception import ACPClientError, ACPCommandLineError
 from acp.property import ACPProperty
+
+
+def _valid_value_for(prop_name):
+    if prop_name == "GPIs":
+        return b"\x00" * 8
+    prop_type = ACPProperty.get_property_info_string(prop_name, "type")
+    if prop_type == "str":
+        return "test"
+    if prop_type in ("dec", "hex"):
+        return 0
+    if prop_type == "mac":
+        return "aa:bb:cc:dd:ee:ff"
+    if prop_type in ("bin", "log"):
+        return b""
+    if prop_type == "cfb":
+        return CFLBinaryPListComposer.compose("test")
+    raise AssertionError(f"no valid test value for property type: {prop_type}")
+
+
+def _full_props_store():
+    return {name: _valid_value_for(name) for name in ACPProperty.get_supported_property_names()}
 
 
 class FakeClient:
@@ -16,6 +38,7 @@ class FakeClient:
         self.password = password
         self.props = None
         self.props_store = {"prop": "abcdwxyz"} if props is None else props
+        self.flashed = None
         self.connected = False
         self.closed = False
         self.fail_get = fail_get
@@ -27,7 +50,12 @@ class FakeClient:
     def get_properties(self, names):
         if self.fail_get:
             raise ACPClientError("router rejected request")
-        return [ACPProperty(name, self.props_store[name]) for name in names]
+        return [
+            ACPProperty(name, self.props_store[name]) for name in names if name in self.props_store
+        ]
+
+    def flash_primary(self, payload):
+        self.flashed = payload
 
     def connect(self):
         self.connected = True
@@ -43,12 +71,13 @@ class FakeClient:
 
 
 class FakeClientFactory:
-    def __init__(self, *, fail_get=False):
+    def __init__(self, *, fail_get=False, props=None):
         self.fail_get = fail_get
+        self.props = props
         self.clients = []
 
     def __call__(self, target, password=""):
-        client = FakeClient(target, password, fail_get=self.fail_get)
+        client = FakeClient(target, password, props=self.props, fail_get=self.fail_get)
         self.clients.append(client)
         return client
 
@@ -374,3 +403,170 @@ def test_cmd_not_implemented_raises():
 
 def test_system_exit_code_none_is_zero():
     assert cli._system_exit_code(SystemExit(None)) == 0
+
+
+def test_run_helpprop_prints_description_with_validation():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(["--helpprop", "LEDc"], stdout=stdout, stderr=stderr)
+
+    assert status == 0
+    assert stdout.getvalue() == "LED color/pattern (dec, 0 <= value <= 3)\n"
+
+
+def test_run_helpprop_prints_description_without_validation():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(["--helpprop", "syNm"], stdout=stdout, stderr=stderr)
+
+    assert status == 0
+    assert stdout.getvalue() == "Device name (str)\n"
+
+
+def test_run_getprop_prints_property_value():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory(props={"syNm": "Office Router"})
+
+    status = cli.run(
+        ["--getprop", "syNm", "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 0
+    assert stdout.getvalue() == "Office Router\n"
+
+
+def test_run_dumpprop_prints_all_supported_properties():
+    names = ACPProperty.get_supported_property_names()
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory(props=_full_props_store())
+
+    status = cli.run(
+        ["--dumpprop", "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 0
+    output = stdout.getvalue()
+    for name in names:
+        description = ACPProperty.get_property_info_string(name, "description")
+        assert description in output
+
+
+def test_run_dump_syslog_prints_log_lines():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory(props={"logm": b"one\x00two\x00"})
+
+    status = cli.run(
+        ["--dump-syslog", "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 0
+    assert stdout.getvalue() == "one\ntwo\n\n"
+
+
+def test_run_acpprop_reports_empty_router_reply():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory(props={})
+
+    status = cli.run(
+        ["--acpprop", "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 1
+    assert "router did not return the acpprop list" in stderr.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "expected"),
+    [
+        ("LEDc", "2", 2),
+        ("dbug", "ff", 0xFF),
+        ("raMA", "aa:bb:cc:dd:ee:ff", b"\xaa\xbb\xcc\xdd\xee\xff"),
+        ("diag", "deadbeef", b"\xde\xad\xbe\xef"),
+        ("syNm", "Office Router", "Office Router"),
+    ],
+)
+def test_run_setprop_sends_typed_values(name, text, expected):
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--setprop", name, text, "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 0
+    assert factory.clients[0].props[name].value == expected
+
+
+def test_run_rejects_cfb_setprop_as_unsupported():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--setprop", "DynS", "anything", "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 1
+    assert 'setting "cfb" properties is not supported by this CLI' in stderr.getvalue()
+    assert factory.clients[0].props is None
+    assert factory.clients[0].closed is True
+
+
+def test_run_flash_primary_sends_firmware_bytes(tmp_path):
+    fw_path = tmp_path / "fw.bin"
+    fw_path.write_bytes(b"firmware")
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--flash-primary", str(fw_path), "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 0
+    assert factory.clients[0].flashed == b"firmware"
+
+
+def test_run_flash_primary_rejects_unreadable_path(tmp_path):
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--flash-primary", str(tmp_path / "missing.bin"), "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 1
+    assert "Basebinary not readable at path" in stderr.getvalue()
+    assert factory.clients[0].flashed is None
