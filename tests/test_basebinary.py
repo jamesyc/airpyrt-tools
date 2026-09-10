@@ -2,7 +2,7 @@ import gzip
 
 import pytest
 from Cryptodome.Cipher import AES
-from helpers import make_basebinary_blob, make_basebinary_header
+from helpers import make_basebinary_blob, make_basebinary_header, make_encrypted_basebinary_blob
 
 from acp.basebinary import Basebinary, BasebinaryError, _derive_key
 
@@ -67,6 +67,28 @@ def test_parse_rejects_bad_checksum_as_basebinary_error():
 
     with pytest.raises(BasebinaryError, match="bad checksum"):
         Basebinary.parse(bytes(blob))
+
+
+def test_parse_decrypts_multi_chunk_encrypted_inner():
+    inner = bytes(range(256)) * 129
+    assert len(inner) > 0x8000
+
+    assert Basebinary.parse(make_encrypted_basebinary_blob(inner)) == inner
+
+
+def test_decrypt_rejects_unknown_model():
+    with pytest.raises(BasebinaryError, match="key missing for model 999"):
+        Basebinary.decrypt(b"x" * 16, 999, 1)
+
+
+@pytest.mark.parametrize("size", [16, 32])
+def test_decrypt_chunk_handles_exact_block_boundaries(size):
+    key = _derive_key(107)
+    iv = Basebinary._header_magic + b"\x01"
+    plaintext = bytes(range(size))
+    encrypted = AES.new(key, AES.MODE_CBC, iv).encrypt(plaintext)
+
+    assert Basebinary.decrypt_chunk(encrypted, key, iv) == plaintext
 
 
 def test_decrypt_chunk_decrypts_full_blocks_and_leaves_odd_tail_plaintext():
