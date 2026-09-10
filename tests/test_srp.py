@@ -2,14 +2,11 @@ import hashlib
 import logging
 
 import pytest
+from conftest import unhex as _unhex
 
 from acp.exception import ACPClientError
 from acp.srp import RFC2945_KEY_LEN, SRP6aClient
 from acp.srp_groups import RFC5054_1536_N, srp_group_fingerprint, validate_srp_group
-
-
-def _unhex(value):
-    return bytes.fromhex("".join(value.split()))
 
 
 def _mgf1_sha1(seed, length):

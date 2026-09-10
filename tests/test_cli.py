@@ -1,18 +1,21 @@
+import gzip
 import io
 import logging
 
 import pytest
+from helpers import make_basebinary_blob
 
 from acp import cli
-from acp.exception import ACPClientError
+from acp.exception import ACPClientError, ACPCommandLineError
 from acp.property import ACPProperty
 
 
 class FakeClient:
-    def __init__(self, target="target", password="password", fail_get=False):
+    def __init__(self, target="target", password="password", props=None, fail_get=False):
         self.target = target
         self.password = password
         self.props = None
+        self.props_store = {"prop": "abcdwxyz"} if props is None else props
         self.connected = False
         self.closed = False
         self.fail_get = fail_get
@@ -24,8 +27,7 @@ class FakeClient:
     def get_properties(self, names):
         if self.fail_get:
             raise ACPClientError("router rejected request")
-        assert names == ["prop"]
-        return [ACPProperty("prop", "abcdwxyz")]
+        return [ACPProperty(name, self.props_store[name]) for name in names]
 
     def connect(self):
         self.connected = True
@@ -245,3 +247,130 @@ def test_main_exits_with_run_status(monkeypatch):
         cli.main(["--listprop"])
 
     assert excinfo.value.code == 7
+
+
+def test_run_decrypt_writes_parsed_inner_bytes(tmp_path):
+    inpath = tmp_path / "in.bin"
+    outpath = tmp_path / "out.bin"
+    inpath.write_bytes(make_basebinary_blob(b"abc"))
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(["--decrypt", str(inpath), str(outpath)], stdout=stdout, stderr=stderr)
+
+    assert status == 0
+    assert outpath.read_bytes() == b"abc"
+
+
+def test_run_extract_writes_decompressed_payload(tmp_path):
+    inpath = tmp_path / "in.bin"
+    outpath = tmp_path / "out.bin"
+    inpath.write_bytes(b"prefix" + gzip.compress(b"hello"))
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(["--extract", str(inpath), str(outpath)], stdout=stdout, stderr=stderr)
+
+    assert status == 0
+    assert outpath.read_bytes() == b"hello"
+
+
+def test_run_decrypt_missing_input_reports_error(tmp_path):
+    outpath = tmp_path / "out.bin"
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(
+        ["--decrypt", str(tmp_path / "missing.bin"), str(outpath)],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 1
+    assert "error:" in stderr.getvalue()
+    assert not outpath.exists()
+
+
+def test_run_rejects_invalid_hex_setprop_value_without_sending():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--setprop", "dbug", "not-hex", "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 1
+    assert 'value for "dbug" must be a hexadecimal integer' in stderr.getvalue()
+    assert factory.clients[0].props is None
+    assert factory.clients[0].closed is True
+
+
+def test_run_rejects_invalid_bin_setprop_value_without_sending():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    factory = FakeClientFactory()
+
+    status = cli.run(
+        ["--setprop", "diag", "not hex!!", "-t", "router", "-p", "password"],
+        client_factory=factory,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 1
+    assert 'value for "diag" must be hexadecimal bytes' in stderr.getvalue()
+    assert factory.clients[0].props is None
+    assert factory.clients[0].closed is True
+
+
+def test_run_rejects_unknown_helpprop_property():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = cli.run(["--helpprop", "nope"], stdout=stdout, stderr=stderr)
+
+    assert status == 1
+    assert "unknown property: nope" in stderr.getvalue()
+
+
+def test_cmd_reboot_sends_reboot_flag():
+    client = FakeClient()
+
+    cli._cmd_reboot(client, None)
+
+    assert list(client.props) == ["acRB"]
+    assert client.props["acRB"].value == 0
+
+
+def test_cmd_factory_reset_sends_ordered_reset_flags():
+    client = FakeClient()
+
+    cli._cmd_factory_reset(client, None)
+
+    assert list(client.props) == ["acRF", "acRB"]
+    assert [prop.value for prop in client.props.values()] == [0, 0]
+
+
+def test_validate_remote_credentials_rejects_unknown_command_type():
+    with pytest.raises(ACPCommandLineError, match="unknown command type"):
+        cli._validate_remote_credentials("bogus", "router", "password", cli.AUTH_LEGACY)
+
+
+def test_validate_remote_credentials_noauth_requires_target_only():
+    cli._validate_remote_credentials(cli.REMOTE_NOAUTH, "router", None, cli.AUTH_LEGACY)
+
+    with pytest.raises(ACPCommandLineError, match="must specify a target"):
+        cli._validate_remote_credentials(cli.REMOTE_NOAUTH, None, None, cli.AUTH_LEGACY)
+
+
+def test_cmd_not_implemented_raises():
+    with pytest.raises(ACPCommandLineError, match="not implemented"):
+        cli._cmd_not_implemented()
+
+
+def test_system_exit_code_none_is_zero():
+    assert cli._system_exit_code(SystemExit(None)) == 0

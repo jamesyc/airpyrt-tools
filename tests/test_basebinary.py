@@ -1,9 +1,8 @@
 import gzip
-import struct
-import zlib
 
 import pytest
 from Cryptodome.Cipher import AES
+from helpers import make_basebinary_blob, make_basebinary_header
 
 from acp.basebinary import Basebinary, BasebinaryError, _derive_key
 
@@ -34,13 +33,13 @@ def test_derive_key_supports_timecapsulesmb_models(assert_hex, model, expected_k
 
 
 def test_parse_header_accepts_wire_header_bytes():
-    header = Basebinary._header_format.pack(Basebinary._header_magic, 1, 107, 2, 3, 4, 5, 0, 6)
+    header = make_basebinary_header()
 
     assert Basebinary.parse_header(header) == (1, 107, 2, 3, 4, 5, 0, 6)
 
 
 def test_parse_rejects_bad_header_magic():
-    header = Basebinary._header_format.pack(b"BAD-FIRMWARE!!\x00", 1, 107, 2, 3, 4, 5, 0, 6)
+    header = make_basebinary_header(magic=b"BAD-FIRMWARE!!\x00")
 
     with pytest.raises(BasebinaryError, match="bad header magic"):
         Basebinary.parse_header(header)
@@ -53,10 +52,21 @@ def test_parse_header_rejects_short_header_as_basebinary_error():
 
 def test_parse_returns_inner_bytes_when_checksum_matches():
     inner = b"abc"
-    header = Basebinary._header_format.pack(Basebinary._header_magic, 1, 107, 2, 3, 4, 5, 0, 6)
-    checksum = zlib.adler32(header + inner) & 0xFFFFFFFF
 
-    assert Basebinary.parse(header + inner + struct.pack(">I", checksum)) == inner
+    assert Basebinary.parse(make_basebinary_blob(inner)) == inner
+
+
+def test_parse_rejects_short_data_as_basebinary_error():
+    with pytest.raises(BasebinaryError, match="not enough data"):
+        Basebinary.parse(b"short")
+
+
+def test_parse_rejects_bad_checksum_as_basebinary_error():
+    blob = bytearray(make_basebinary_blob(b"abc"))
+    blob[len(blob) // 2] ^= 0xFF
+
+    with pytest.raises(BasebinaryError, match="bad checksum"):
+        Basebinary.parse(bytes(blob))
 
 
 def test_decrypt_chunk_decrypts_full_blocks_and_leaves_odd_tail_plaintext():
