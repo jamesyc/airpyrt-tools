@@ -8,7 +8,7 @@ See LICENSE
 ### Requirements
 
 - Python 3.9 or newer, Linux or Mac. Windows is untested.
-- Tested on Python 3.9 through 3.14
+- Tested on Python 3.9 through 3.15; CI covers 3.9 through 3.14
 - pycryptodomex
 
 Python 3.9 support is for compatibility with older platforms. Python 3.9 is
@@ -133,6 +133,9 @@ python -m pip check
 ```
 
 The ruff target covers the package, packaging shim, and tests.
+CI runs lint on Python 3.9 and distribution checks on Python 3.14. Releases
+also build on Python 3.14, so packaging tools can update without dropping
+Python 3.9 runtime compatibility.
 
 
 ### Release
